@@ -68,6 +68,19 @@ int main() {
 	std::cout << "A.kronecker_product(B):" << std::endl;
 	print_matrix(A.kronecker_product(B));
 	
+	Matrix<4,4,std::complex<float>> DFT, iDFT;
+	DFT.DFT();
+	iDFT = DFT.inverse();
+	std::cout << "DFT:" << std::endl;
+	print_matrix(DFT);
+	std::cout << "iDFT:" << std::endl;
+	print_matrix(iDFT);
+	Vector<4, std::complex<float>> a_complex = static_cast<Vector<4, std::complex<float>>>(a);
+	std::cout << "DFT*a:" << std::endl;
+	print_matrix(DFT*a_complex);
+	std::cout << "iDFT*(DFT*a):" << std::endl;
+	print_matrix(iDFT*(DFT*a_complex));
+	
 	
     return 0;
 }

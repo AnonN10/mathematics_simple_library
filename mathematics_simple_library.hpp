@@ -6,6 +6,7 @@
 #include <iterator>
 #include <functional>
 #include <numeric>
+#include <numbers>
 #include <complex>
 #include <array>
 
@@ -40,18 +41,39 @@ namespace Maths {
 		
 		Matrix<M, N, Scalar>(Matrix<M, N, Scalar> const&) = default;
 		
-		void identity() {
-			for(IndexType m = 0; m < M; ++m)
-				for(IndexType n = 0; n < N; ++n)
-					data[m][n] = m==n? 1.0f : 0.0f;
-		}
-		
 		//flat list is stored in memory as is due to row major order
 		void set(std::array<Scalar, M*N> flat_list) {
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
 					data[m][n] = flat_list[N*m + n];
 		}
+		
+		//builders
+		
+		void identity() {
+			for(IndexType m = 0; m < M; ++m)
+				for(IndexType n = 0; n < N; ++n)
+					data[m][n] = m==n? 1.0f : 0.0f;
+		}
+		
+		void DFT() {
+			static_assert(N==M, "Operation undefined: DFT matrix must be square");
+			static_assert(is_complex_v<Scalar>, "Operation undefined: DFT matrix must be complex");
+			
+			using VType = Scalar::value_type;
+			
+			constexpr Scalar i = Scalar(VType(0.0), VType(1.0));
+			constexpr VType pi = std::numbers::pi_v<VType>;
+			
+			const VType norm = VType(1)/std::sqrt(VType(N));
+			const Scalar omega = std::exp(VType(-2.0) * pi * i / Scalar(VType(N)));
+			
+			for(IndexType m = 0; m < M; ++m)
+				for(IndexType n = 0; n < N; ++n)
+					data[m][n] = std::pow(omega, VType(n*m));
+		}
+		
+		//getters
 		
 		Matrix<1, N, Scalar> row(IndexType m) const {
 			Matrix<1, N, Scalar> result;
@@ -68,6 +90,15 @@ namespace Maths {
 		}
 		
 		//operators
+		
+		template<typename T>
+		explicit operator Matrix<M, N, T>() const {
+			Matrix<M, N, T> result;
+			for(IndexType m = 0; m < M; ++m)
+				for(IndexType n = 0; n < N; ++n)
+					result[m][n] = T(data[m][n]);
+			return result;
+		}
 		
 		ElementIndexed operator()(IndexType i) {
 			//vector: index first column
@@ -108,7 +139,7 @@ namespace Maths {
 					result.data[m][n] = std::transform_reduce(
 											std::begin(this->data[m]), std::end(this->data[m]),
 											std::begin(other_T.data[n]),
-											0.0f, std::plus<>{}, std::multiplies<>{}
+											Scalar(0.0), std::plus<>{}, std::multiplies<>{}
 										);
 				}
 			}
@@ -203,7 +234,7 @@ namespace Maths {
 			Matrix<M, N, Scalar> result;
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
-					result.data[m][n] = ((m+n)&1?-1:1)*submatrix(m,n).determinant();
+					result.data[m][n] = Scalar((m+n)&1?-1:1)*submatrix(m,n).determinant();
 			return result;
 		}
 		
@@ -220,7 +251,7 @@ namespace Maths {
 			} else {
 				Scalar result = 0.0f;
 				for (int n = 0; n < N; n++)
-					result += data[0][n] * (n&1?-1:1)*submatrix(0,n).determinant();
+					result += data[0][n] * Scalar(n&1?-1:1)*submatrix(0,n).determinant();
 				return result;
 			}
 			return 0.0f;
