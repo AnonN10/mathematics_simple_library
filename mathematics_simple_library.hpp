@@ -20,6 +20,9 @@ namespace Maths {
 	struct is_complex_t<std::complex<T>> : public std::true_type {};
 	template<typename T>
 	inline constexpr bool is_complex_v = is_complex_t<T>::value;
+	
+	template<typename T>
+	constexpr bool is_power_of_two(T x) { return x && ((x & (x-1)) == 0); }
 
 	template<IndexType M, IndexType N, typename Scalar = float>
 	struct Matrix
@@ -71,6 +74,28 @@ namespace Maths {
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
 					data[m][n] = std::pow(omega, VType(n*m));
+		}
+		
+		void sylvester_walsh() {
+			static_assert(N==M, "Operation undefined: Walsh matrices built using Sylvester's construction must be square");
+			static_assert(is_power_of_two(N), "Operation undefined: Walsh matrices built using Sylvester's construction must have dimension which is a power of 2");
+			
+			if constexpr(N==1) {
+				//Hadamard order 1
+				data[0][0] = 1;
+			} else if constexpr(N==2) {
+				//Hadamard order 2
+				set({
+					1,  1,
+					1, -1,
+				});
+			} else {
+				Matrix<2, 2, Scalar> H_2;
+				Matrix<M/2, N/2, Scalar> H_n;
+				H_n.sylvester_walsh();
+				H_2.sylvester_walsh();
+				(*this) = H_2.kronecker_product(H_n);
+			}
 		}
 		
 		//getters

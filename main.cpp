@@ -81,6 +81,18 @@ int main() {
 	std::cout << "iDFT*(DFT*a):" << std::endl;
 	print_matrix(iDFT*(DFT*a_complex));
 	
+	std::cout << "Walsh n=2:" << std::endl;
+	Matrix<4,4> walsh2;
+	walsh2.sylvester_walsh();
+	print_matrix(walsh2);
+	std::cout << "Walsh n=4:" << std::endl;
+	Matrix<4,4> walsh4;
+	walsh4.sylvester_walsh();
+	print_matrix(walsh4);
+	std::cout << "Walsh n=8:" << std::endl;
+	Matrix<8,8> walsh8;
+	walsh8.sylvester_walsh();
+	print_matrix(walsh8);
 	
     return 0;
 }
