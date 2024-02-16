@@ -62,13 +62,13 @@ namespace Maths {
 		void identity() {
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
-					data[m][n] = m==n? 1.0f : 0.0f;
+					data[m][n] = m==n? Scalar(1) : Scalar(0);
 		}
 		
 		void hadamard_identity() {
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
-					data[m][n] = 1.0f;
+					data[m][n] = Scalar(1);
 		}
 		
 		void DFT() {
@@ -77,11 +77,11 @@ namespace Maths {
 			
 			using VType = Scalar::value_type;
 			
-			constexpr Scalar i = Scalar(VType(0.0), VType(1.0));
+			constexpr Scalar i = Scalar(VType(0), VType(1));
 			constexpr VType pi = std::numbers::pi_v<VType>;
 			
 			const VType norm = VType(1)/std::sqrt(VType(N));
-			const Scalar omega = std::exp(VType(-2.0) * pi * i / Scalar(VType(N)));
+			const Scalar omega = std::exp(VType(-2) * pi * i / Scalar(VType(N)));
 			
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
@@ -201,7 +201,7 @@ namespace Maths {
 					result.data[m][n] = std::transform_reduce(
 											std::begin(this->data[m]), std::end(this->data[m]),
 											std::begin(other_T.data[n]),
-											Scalar(0.0), std::plus<>{}, std::multiplies<>{}
+											Scalar(0), std::plus<>{}, std::multiplies<>{}
 										);
 				}
 			}
@@ -329,12 +329,12 @@ namespace Maths {
 			} else if constexpr(M==2) {
 				return data[0][0]*data[1][1] - data[0][1]*data[1][0];
 			} else {
-				Scalar result = 0.0f;
+				Scalar result = Scalar(0);
 				for (int n = 0; n < N; n++)
 					result += data[0][n] * Scalar(n&1?-1:1)*submatrix(0,n).determinant();
 				return result;
 			}
-			return 0.0f;
+			return Scalar(0);
 		}
 		Scalar det() const { return determinant(); }
 		
@@ -360,7 +360,7 @@ namespace Maths {
 		Matrix<N, N, Scalar, use_heap> gram() const { return gramian(); }
 		
 		Scalar euclidean_norm() const {
-			Scalar sum = Scalar(0.0);
+			Scalar sum = Scalar(0);
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
 					sum += data[m][n]*data[m][n];
