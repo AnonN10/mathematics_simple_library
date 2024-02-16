@@ -210,7 +210,7 @@ namespace Maths {
 		
 		template<IndexType M_other, IndexType N_other, bool use_heap_other>
 		Matrix<M, N_other, Scalar, use_heap> operator/(const Matrix<M_other, N_other, Scalar, use_heap_other>& other) const {
-			return (*this)/other.inverse();
+			return other.inverse()*(*this);
 		}
 		
 		template<bool use_heap_other>
@@ -295,6 +295,38 @@ namespace Maths {
 					result.data[n][m] = this->data[m][n];
 			return result;
 		}
+
+		//numerical stability improvements by Trolljanhorse
+		Matrix<M, N, Scalar, use_heap> reduced_row_echelon_form() const {
+			Matrix<M, N, Scalar, use_heap> result = *this;
+			for(IndexType lead = 0; lead < M; ++lead) {
+				Scalar divisor, multiplier;
+				//1. Find largest entry in column `lead`
+				IndexType pivot = lead;
+				for (IndexType m = lead; m < M; ++m) {
+					if (std::abs(result[pivot][lead]) < std::abs(result[m][lead])) {
+						pivot = m;
+					}
+				}
+				//2. Swap row `lead` with row of largest column
+				for (IndexType n = 0; n < N; ++n) {
+					std::swap(result[pivot][n], result[lead][n]);
+				}
+
+				for (IndexType m = 0; m < M; ++m) {
+					divisor = result[lead][lead];
+					multiplier = result[m][lead] / result[lead][lead];
+					for (IndexType n = 0; n < N; ++n) {
+						if (m == lead)
+							result[m][n] /= divisor;
+						else
+							result[m][n] -= result[lead][n] * multiplier;
+					}
+				}
+			}
+			return result;
+		}
+		Matrix<M, N, Scalar, use_heap> rref() const { return reduced_row_echelon_form(); }
 		
 		Matrix<M-1, N-1, Scalar, use_heap> submatrix(IndexType m, IndexType n) const {
 			Matrix<M-1, N-1, Scalar, use_heap> result;
@@ -338,6 +370,9 @@ namespace Maths {
 		}
 		Scalar det() const { return determinant(); }
 		
+		Matrix<M, N, Scalar, use_heap> inverse_gauss_jordan() const {
+			return augment(Matrix<M, N, Scalar, use_heap>()).rref().split_right<N>();
+		}
 		Matrix<M, N, Scalar, use_heap> inverse() const {
 			return adjugate()/determinant();
 		}

@@ -67,6 +67,10 @@ int main() {
 	print_matrix(B);
 	std::cout << "A.kronecker_product(B):" << std::endl;
 	print_matrix(A.kronecker_product(B));
+	std::cout << "A.augment(B):" << std::endl;
+	print_matrix(A.augment(B));
+	std::cout << "A.augment(B).split_right<2>():" << std::endl;
+	print_matrix(A.augment(B).split_right<2>());
 	
 	Matrix<4,4,std::complex<float>> DFT, iDFT;
 	DFT.DFT();
@@ -82,7 +86,7 @@ int main() {
 	print_matrix(iDFT*(DFT*a_complex));
 	
 	std::cout << "Walsh n=2:" << std::endl;
-	Matrix<4,4> walsh2;
+	Matrix<2,2> walsh2;
 	walsh2.sylvester_walsh();
 	print_matrix(walsh2);
 	std::cout << "Walsh n=4:" << std::endl;
@@ -93,6 +97,22 @@ int main() {
 	Matrix<8,8> walsh8;
 	walsh8.sylvester_walsh();
 	print_matrix(walsh8);
+
+	Matrix<3,4,double> abc({
+		5, -6, -7,   7,
+        3, -2,  5, -17,
+        2,  4, -3,  29
+	});
+	std::cout << "abc:" << std::endl;
+	print_matrix(abc);
+	std::cout << "abc.rref():" << std::endl;
+	print_matrix(abc.rref());
+	std::cout << "abc.split_right<1>():" << std::endl;
+	print_matrix(abc.split_right<1>());
+	std::cout << "abc.split_right<1>().inverse_gauss_jordan():" << std::endl;
+	print_matrix(abc.split_right<1>().inverse_gauss_jordan());
+	std::cout << "abc.split_right<1>().inverse_gauss_jordan()*abc.split_right<1>():" << std::endl;
+	print_matrix(abc.split_right<1>().inverse_gauss_jordan()*abc.split_right<1>());
 	
     return 0;
 }
