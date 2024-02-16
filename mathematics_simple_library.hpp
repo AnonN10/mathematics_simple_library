@@ -24,25 +24,31 @@ namespace Maths {
 	template<typename T>
 	constexpr bool is_power_of_two(T x) { return x && ((x & (x-1)) == 0); }
 
-	template<IndexType M, IndexType N, typename Scalar = float>
+	template<IndexType M, IndexType N, typename Scalar = float, bool use_heap = false>
 	struct Matrix
 	{	
 		//row major: row M, column N
-		Scalar data[M][N];
+		std::conditional_t<
+			use_heap,
+			std::vector<std::array<Scalar, N>>,
+			std::array<std::array<Scalar, N>, M>
+		> data;
 		
 		struct EmptyType {};
-		using ElementIndexed = std::conditional_t<M == 1 || N == 1, Scalar, Matrix<M, 1, Scalar>>;
+		using ElementIndexed = std::conditional_t<M == 1 || N == 1, Scalar, Matrix<M, 1, Scalar, use_heap>>;
 		
 		//constructors and setters
 		
 		Matrix() {
+			if constexpr(use_heap) data.resize(M);
 			identity();
 		}
 		Matrix(std::array<Scalar, M*N> flat_list) {
+			if constexpr(use_heap) data.resize(M);
 			set(flat_list);
 		}
 		
-		Matrix<M, N, Scalar>(Matrix<M, N, Scalar> const&) = default;
+		Matrix<M, N, Scalar, use_heap>(Matrix<M, N, Scalar, use_heap> const&) = default;
 		
 		//flat list is stored in memory as is due to row major order
 		void set(std::array<Scalar, M*N> flat_list) {
@@ -90,8 +96,8 @@ namespace Maths {
 					1, -1,
 				});
 			} else {
-				Matrix<2, 2, Scalar> H_2;
-				Matrix<M/2, N/2, Scalar> H_n;
+				Matrix<2, 2, Scalar, use_heap> H_2;
+				Matrix<M/2, N/2, Scalar, use_heap> H_n;
 				H_n.sylvester_walsh();
 				H_2.sylvester_walsh();
 				(*this) = H_2.kronecker_product(H_n);
@@ -99,16 +105,32 @@ namespace Maths {
 		}
 		
 		//getters
+
+		std::array<Scalar, M*N> get() {
+			std::array<Scalar, M*N> flat_list;
+			for(IndexType m = 0; m < M; ++m)
+				for(IndexType n = 0; n < N; ++n)
+					flat_list[N*m + n] = data[m][n];
+			return flat_list;
+		}
+
+		std::vector<Scalar> get_v() {
+			std::vector<Scalar> flat_list(M*N);
+			for(IndexType m = 0; m < M; ++m)
+				for(IndexType n = 0; n < N; ++n)
+					flat_list[N*m + n] = data[m][n];
+			return flat_list;
+		}
 		
-		Matrix<1, N, Scalar> row(IndexType m) const {
-			Matrix<1, N, Scalar> result;
+		Matrix<1, N, Scalar, use_heap> row(IndexType m) const {
+			Matrix<1, N, Scalar, use_heap> result;
 			for(IndexType n = 0; n < N; ++n)
 				result[0][n] = data[m][n];
 			return result;
 		}
 		
-		Matrix<M, 1, Scalar> column(IndexType n) const {
-			Matrix<M, 1, Scalar> result;
+		Matrix<M, 1, Scalar, use_heap> column(IndexType n) const {
+			Matrix<M, 1, Scalar, use_heap> result;
 			for(IndexType m = 0; m < M; ++m)
 				result.data[m][0] = data[m][n];
 			return result;
@@ -117,8 +139,8 @@ namespace Maths {
 		//operators
 		
 		template<typename T>
-		explicit operator Matrix<M, N, T>() const {
-			Matrix<M, N, T> result;
+		explicit operator Matrix<M, N, T, use_heap>() const {
+			Matrix<M, N, T, use_heap> result;
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
 					result[m][n] = T(data[m][n]);
@@ -138,25 +160,25 @@ namespace Maths {
 			return data[row][column];
 		}
 		
-		Scalar* operator[](IndexType m) { return data[m]; }
-		const Scalar* operator[](IndexType m) const { return data[m]; }
+		auto operator[](IndexType m) { return data[m]; }
+		const auto operator[](IndexType m) const { return data[m]; }
 		
-		Matrix<M, N, Scalar> operator-() const {
-			Matrix<M, N, Scalar> result;
+		Matrix<M, N, Scalar, use_heap> operator-() const {
+			Matrix<M, N, Scalar, use_heap> result;
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
 					result.data[m][n] = -data[m][n];
 			return result;
 		}
 		
-		template<IndexType M_other, IndexType N_other>
-		Matrix<M, N_other, Scalar> operator*(const Matrix<M_other, N_other, Scalar>& other) const {
+		template<IndexType M_other, IndexType N_other, bool use_heap_other>
+		Matrix<M, N_other, Scalar, use_heap> operator*(const Matrix<M_other, N_other, Scalar, use_heap_other>& other) const {
 			static_assert(N==M_other, "Operation undefined: for matrix multiplication the number of columns of the first must match the number of rows of the second");
-			Matrix<M, N_other, Scalar> result;
+			Matrix<M, N_other, Scalar, use_heap || use_heap_other> result;
 			//matrix multiplication is essentially a collection of dot product permutations of
 			//rows of the first and columnts of the second, therefore we can transpose the second
 			//to perform just the dot products of row permutations
-			Matrix<N_other, M_other, Scalar> other_T = other.transpose();
+			Matrix<N_other, M_other, Scalar, use_heap_other> other_T = other.transpose();
 			//for each element of the resulting matrix
 			for(IndexType m = 0; m < M; ++m) {
 				for(decltype(N_other) n = 0; n < N_other; ++n) {
@@ -171,33 +193,35 @@ namespace Maths {
 			return result;
 		}
 		
-		template<IndexType M_other, IndexType N_other>
-		Matrix<M, N_other, Scalar> operator/(const Matrix<M_other, N_other, Scalar>& other) const {
+		template<IndexType M_other, IndexType N_other, bool use_heap_other>
+		Matrix<M, N_other, Scalar, use_heap> operator/(const Matrix<M_other, N_other, Scalar, use_heap_other>& other) const {
 			return (*this)/other.inverse();
 		}
 		
-		Matrix<M, N, Scalar> operator+(const Matrix<M, N, Scalar>& other) const {
-			Matrix<M, N, Scalar> result;
+		template<bool use_heap_other>
+		Matrix<M, N, Scalar, use_heap> operator+(const Matrix<M, N, Scalar, use_heap_other>& other) const {
+			Matrix<M, N, Scalar, use_heap> result;
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
 					result.data[m][n] = data[m][n]+other[m][n];
 			return result;
 		}
 		
-		Matrix<M, N, Scalar> operator-(const Matrix<M, N, Scalar>& other) const {
+		template<bool use_heap_other>
+		Matrix<M, N, Scalar, use_heap> operator-(const Matrix<M, N, Scalar, use_heap_other>& other) const {
 			return (*this)+(-other);
 		}
 		
-		Matrix<M, N, Scalar> operator*(Scalar scalar) const {
-			Matrix<M, N, Scalar> result;
+		Matrix<M, N, Scalar, use_heap> operator*(Scalar scalar) const {
+			Matrix<M, N, Scalar, use_heap> result;
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
 					result.data[m][n] = data[m][n]*scalar;
 			return result;
 		}
 		
-		Matrix<M, N, Scalar> operator/(Scalar scalar) const {
-			Matrix<M, N, Scalar> result;
+		Matrix<M, N, Scalar, use_heap> operator/(Scalar scalar) const {
+			Matrix<M, N, Scalar, use_heap> result;
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
 					result.data[m][n] = data[m][n]/scalar;
@@ -206,17 +230,18 @@ namespace Maths {
 		
 		//methods
 		
-		Matrix<M, N, Scalar> hadamard_product(const Matrix<M, N, Scalar>& other) const {
-			Matrix<M, N, Scalar> result;
+		template<bool use_heap_other>
+		Matrix<M, N, Scalar, use_heap> hadamard_product(const Matrix<M, N, Scalar, use_heap_other>& other) const {
+			Matrix<M, N, Scalar, use_heap> result;
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
 					result.data[m][n] = data[m][n]*other[m][n];
 			return result;
 		}
 		
-		template<IndexType M_other, IndexType N_other>
-		Matrix<M*M_other, N*N_other, Scalar> kronecker_product(const Matrix<M_other, N_other, Scalar>& other) const {
-			Matrix<M*M_other, N*N_other, Scalar> result;
+		template<IndexType M_other, IndexType N_other, bool use_heap_other>
+		Matrix<M*M_other, N*N_other, Scalar, use_heap> kronecker_product(const Matrix<M_other, N_other, Scalar, use_heap_other>& other) const {
+			Matrix<M*M_other, N*N_other, Scalar, use_heap> result;
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
 					for(IndexType m_other = 0; m_other < M_other; ++m_other)
@@ -225,7 +250,7 @@ namespace Maths {
 			return result;
 		}
 		
-		Scalar dot(const Matrix<M, N>& other) {
+		Scalar dot(const Matrix<M, N, Scalar, use_heap>& other) {
 			static_assert(M==1||N==1, "Operation undefined: dot product is defined only for vectors and covectors");
 			//vector
 			if constexpr(N==1) return (this->transpose() * other)(0);
@@ -233,16 +258,16 @@ namespace Maths {
 			else return this->transpose().dot(other.transpose());
 		}
 		
-		Matrix<N, M, Scalar> transpose() const {
-			Matrix<N, M, Scalar> result;
+		Matrix<N, M, Scalar, use_heap> transpose() const {
+			Matrix<N, M, Scalar, use_heap> result;
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
 					result.data[n][m] = this->data[m][n];
 			return result;
 		}
 		
-		Matrix<M-1, N-1, Scalar> submatrix(IndexType m, IndexType n) const {
-			Matrix<M-1, N-1, Scalar> result;
+		Matrix<M-1, N-1, Scalar, use_heap> submatrix(IndexType m, IndexType n) const {
+			Matrix<M-1, N-1, Scalar, use_heap> result;
 			for(IndexType m_src = 0, m_dest = 0; m_src < M; ++m_src) {
 				if(m_src == m) continue;
 				for(IndexType n_src = 0, n_dest = 0; n_src < N; ++n_src) {
@@ -255,15 +280,15 @@ namespace Maths {
 			return result;
 		}
 		
-		Matrix<M, N, Scalar> cofactor() const {
-			Matrix<M, N, Scalar> result;
+		Matrix<M, N, Scalar, use_heap> cofactor() const {
+			Matrix<M, N, Scalar, use_heap> result;
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
 					result.data[m][n] = Scalar((m+n)&1?-1:1)*submatrix(m,n).determinant();
 			return result;
 		}
 		
-		Matrix<M, N, Scalar> adjugate() const {
+		Matrix<M, N, Scalar, use_heap> adjugate() const {
 			return cofactor().transpose();
 		}
 		
@@ -283,26 +308,26 @@ namespace Maths {
 		}
 		Scalar det() const { return determinant(); }
 		
-		Matrix<M, N, Scalar> inverse() const {
+		Matrix<M, N, Scalar, use_heap> inverse() const {
 			return adjugate()/determinant();
 		}
-		Matrix<M, N, Scalar> inv() const { return inverse(); }
+		Matrix<M, N, Scalar, use_heap> inv() const { return inverse(); }
 		
-		Matrix<M, N, Scalar> conjugate() const {
+		Matrix<M, N, Scalar, use_heap> conjugate() const {
 			if constexpr(is_complex_v<Scalar>) {
-				Matrix<M, N, Scalar> result;
+				Matrix<M, N, Scalar, use_heap> result;
 				for(IndexType m = 0; m < M; ++m)
 					for(IndexType n = 0; n < N; ++n)
 						result[m][n] = std::conj(data[m][n]);
 				return result;
 			} else return *this;
 		}
-		Matrix<M, N, Scalar> conj() const { return conjugate(); }
+		Matrix<M, N, Scalar, use_heap> conj() const { return conjugate(); }
 		
-		Matrix<N, N, Scalar> gramian() const {
+		Matrix<N, N, Scalar, use_heap> gramian() const {
 			return conjugate().transpose()*(*this);
 		}
-		Matrix<N, N, Scalar> gram() const { return gramian(); }
+		Matrix<N, N, Scalar, use_heap> gram() const { return gramian(); }
 		
 		Scalar euclidean_norm() const {
 			Scalar sum = Scalar(0.0);
@@ -313,18 +338,18 @@ namespace Maths {
 		}
 		Scalar norm() const { return euclidean_norm(); }
 		
-		Matrix<M, N, Scalar> euclidean_normalize() const {
+		Matrix<M, N, Scalar, use_heap> euclidean_normalize() const {
 			return (*this)/euclidean_norm();
 		}
-		Matrix<M, N, Scalar> normalize() const { return euclidean_normalize(); }
+		Matrix<M, N, Scalar, use_heap> normalize() const { return euclidean_normalize(); }
 	};
 
 	//column-vector
-	template<IndexType M, typename Scalar = float>
-	using Vector = Matrix<M, 1, Scalar>;
+	template<IndexType M, typename Scalar = float, bool use_heap = false>
+	using Vector = Matrix<M, 1, Scalar, use_heap>;
 
 	//row-vector
-	template<IndexType N, typename Scalar = float>
-	using Covector = Matrix<1, N, Scalar>;
+	template<IndexType N, typename Scalar = float, bool use_heap = false>
+	using Covector = Matrix<1, N, Scalar, use_heap>;
 
 } // namespace Maths
