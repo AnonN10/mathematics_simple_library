@@ -135,6 +135,15 @@ namespace Maths {
 				result.data[m][0] = data[m][n];
 			return result;
 		}
+
+		template<IndexType N_first>
+		Matrix<M, N-N_first, Scalar, use_heap> split_right() const {
+			Matrix<M, N-N_first, Scalar, use_heap> result;
+			for(IndexType m = 0; m < M; ++m)
+				for(IndexType n = 0; n < N-N_first; ++n)
+					result[m][n] = data[m][n+N_first];
+			return result;
+		}
 		
 		//operators
 		
