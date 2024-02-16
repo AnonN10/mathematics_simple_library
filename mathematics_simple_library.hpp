@@ -160,7 +160,7 @@ namespace Maths {
 			return data[row][column];
 		}
 		
-		auto operator[](IndexType m) { return data[m]; }
+		auto&& operator[](IndexType m) { return data[m]; }
 		const auto operator[](IndexType m) const { return data[m]; }
 		
 		Matrix<M, N, Scalar, use_heap> operator-() const {
@@ -172,7 +172,7 @@ namespace Maths {
 		}
 		
 		template<IndexType M_other, IndexType N_other, bool use_heap_other>
-		Matrix<M, N_other, Scalar, use_heap> operator*(const Matrix<M_other, N_other, Scalar, use_heap_other>& other) const {
+		Matrix<M, N_other, Scalar, use_heap || use_heap_other> operator*(const Matrix<M_other, N_other, Scalar, use_heap_other>& other) const {
 			static_assert(N==M_other, "Operation undefined: for matrix multiplication the number of columns of the first must match the number of rows of the second");
 			Matrix<M, N_other, Scalar, use_heap || use_heap_other> result;
 			//matrix multiplication is essentially a collection of dot product permutations of
@@ -229,6 +229,21 @@ namespace Maths {
 		}
 		
 		//methods
+
+		template<IndexType M_other, IndexType N_other, bool use_heap_other>
+		Matrix<M, N+N_other, Scalar, use_heap || use_heap_other> augment(const Matrix<M_other, N_other, Scalar, use_heap_other>& other) const {
+			static_assert(M==M_other, "Operation undefined: matrix can only be augmented with a matrix with the same amount of rows");
+			Matrix<M, N+N_other, Scalar, use_heap || use_heap_other> result;
+			//copy current's columns
+			for(IndexType m = 0; m < M; ++m)
+				for(IndexType n = 0; n < N; ++n)
+					result[m][n] = data[m][n];
+			//copy other's columns
+			for(IndexType m = 0; m < M_other; ++m)
+				for(IndexType n = 0; n < N_other; ++n)
+					result[m][N+n] = other[m][n];
+			return result;
+		}
 		
 		template<bool use_heap_other>
 		Matrix<M, N, Scalar, use_heap> hadamard_product(const Matrix<M, N, Scalar, use_heap_other>& other) const {
