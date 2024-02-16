@@ -65,6 +65,12 @@ namespace Maths {
 					data[m][n] = m==n? 1.0f : 0.0f;
 		}
 		
+		void hadamard_identity() {
+			for(IndexType m = 0; m < M; ++m)
+				for(IndexType n = 0; n < N; ++n)
+					data[m][n] = 1.0f;
+		}
+		
 		void DFT() {
 			static_assert(N==M, "Operation undefined: DFT matrix must be square");
 			static_assert(is_complex_v<Scalar>, "Operation undefined: DFT matrix must be complex");
