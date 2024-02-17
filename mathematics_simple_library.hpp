@@ -20,6 +20,10 @@ namespace Maths {
 	struct is_complex_t<std::complex<T>> : public std::true_type {};
 	template<typename T>
 	inline constexpr bool is_complex_v = is_complex_t<T>::value;
+
+	template <class T, class = void> struct value_type { using type = T; };
+	template <class T> struct value_type<T, std::void_t<typename T::value_type>> { using type = typename T::value_type; };
+	template <class T> using value_type_t = typename value_type<T>::type;
 	
 	template<typename T>
 	constexpr bool is_power_of_two(T x) { return x && ((x & (x-1)) == 0); }
@@ -35,7 +39,12 @@ namespace Maths {
 		> data;
 		
 		struct EmptyType {};
-		using ElementIndexed = std::conditional_t<M == 1 || N == 1, Scalar, Matrix<M, 1, Scalar, use_heap>>;
+		using ElementIndexed = std::conditional_t<
+			M == 1 || N == 1,
+			Scalar,
+			Matrix<M, 1, Scalar, use_heap>
+		>;
+		using ValueType = value_type_t<Scalar>;
 		
 		//constructors and setters
 		
@@ -52,6 +61,13 @@ namespace Maths {
 		
 		//flat list is stored in memory as is due to row major order
 		void set(std::array<Scalar, M*N> flat_list) {
+			for(IndexType m = 0; m < M; ++m)
+				for(IndexType n = 0; n < N; ++n)
+					data[m][n] = flat_list[N*m + n];
+		}
+
+		void set_v(std::vector<Scalar> flat_list) {
+			if(flat_list.size() < M*N) std::abort();
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
 					data[m][n] = flat_list[N*m + n];
@@ -75,17 +91,15 @@ namespace Maths {
 			static_assert(N==M, "Operation undefined: DFT matrix must be square");
 			static_assert(is_complex_v<Scalar>, "Operation undefined: DFT matrix must be complex");
 			
-			using VType = Scalar::value_type;
+			constexpr Scalar i = Scalar(ValueType(0), ValueType(1));
+			constexpr ValueType pi = std::numbers::pi_v<ValueType>;
 			
-			constexpr Scalar i = Scalar(VType(0), VType(1));
-			constexpr VType pi = std::numbers::pi_v<VType>;
-			
-			const VType norm = VType(1)/std::sqrt(VType(N));
-			const Scalar omega = std::exp(VType(-2) * pi * i / Scalar(VType(N)));
+			const ValueType norm = ValueType(1)/std::sqrt(ValueType(N));
+			const Scalar omega = std::exp(ValueType(-2) * pi * i / Scalar(ValueType(N)));
 			
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
-					data[m][n] = std::pow(omega, VType(n*m));
+					data[m][n] = std::pow(omega, ValueType(n*m));
 		}
 		
 		void sylvester_walsh() {
@@ -242,6 +256,22 @@ namespace Maths {
 					result.data[m][n] = data[m][n]/scalar;
 			return result;
 		}
+
+		Matrix<M, N, Scalar, use_heap> operator+(Scalar scalar) const {
+			Matrix<M, N, Scalar, use_heap> result;
+			for(IndexType m = 0; m < M; ++m)
+				for(IndexType n = 0; n < N; ++n)
+					result.data[m][n] = data[m][n]+scalar;
+			return result;
+		}
+		
+		Matrix<M, N, Scalar, use_heap> operator-(Scalar scalar) const {
+			Matrix<M, N, Scalar, use_heap> result;
+			for(IndexType m = 0; m < M; ++m)
+				for(IndexType n = 0; n < N; ++n)
+					result.data[m][n] = data[m][n]-scalar;
+			return result;
+		}
 		
 		//methods
 
@@ -294,6 +324,10 @@ namespace Maths {
 				for(IndexType n = 0; n < N; ++n)
 					result.data[n][m] = this->data[m][n];
 			return result;
+		}
+
+		Matrix<N, M, Scalar, use_heap> transpose_hermitian() const {
+			return conjugate().transpose();
 		}
 
 		//numerical stability improvements by Trolljanhorse
@@ -393,20 +427,74 @@ namespace Maths {
 			return conjugate().transpose()*(*this);
 		}
 		Matrix<N, N, Scalar, use_heap> gram() const { return gramian(); }
+
+		Scalar max() const {
+			Scalar maximum = Scalar(0);
+			for(IndexType m = 0; m < M; ++m)
+				for(IndexType n = 0; n < N; ++n) {
+					Scalar value = data[m][n];
+					if((m==0 && n==0) || maximum < value)
+						maximum = value;
+				}
+			return maximum;
+		}
+
+		Scalar min() const {
+			Scalar minimum = Scalar(0);
+			for(IndexType m = 0; m < M; ++m)
+				for(IndexType n = 0; n < N; ++n) {
+					Scalar value = data[m][n];
+					if((m==0 && n==0) || minimum > value)
+						minimum = value;
+				}
+			return minimum;
+		}
+
+		ValueType norm_max() const {
+			ValueType maximum = ValueType(0);
+			for(IndexType m = 0; m < M; ++m)
+				for(IndexType n = 0; n < N; ++n) {
+					ValueType magnitude = std::abs(data[m][n]);
+					if((m==0 && n==0) || maximum < magnitude)
+						maximum = magnitude;
+				}
+			return maximum;
+		}
+
+		ValueType norm_min() const {
+			ValueType minimum = ValueType(0);
+			for(IndexType m = 0; m < M; ++m)
+				for(IndexType n = 0; n < N; ++n) {
+					ValueType magnitude = std::abs(data[m][n]);
+					if((m==0 && n==0) || minimum > magnitude)
+						minimum = magnitude;
+				}
+			return minimum;
+		}
 		
-		Scalar euclidean_norm() const {
-			Scalar sum = Scalar(0);
+		ValueType norm_frobenius() const {
+			ValueType sum = ValueType(0);
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
 					sum += data[m][n]*data[m][n];
 			return std::sqrt(sum);
 		}
-		Scalar norm() const { return euclidean_norm(); }
+		ValueType norm_euclidean() const { return norm_frobenius(); }
+		ValueType norm() const { return norm_frobenius(); }
 		
-		Matrix<M, N, Scalar, use_heap> euclidean_normalize() const {
-			return (*this)/euclidean_norm();
+		Matrix<M, N, Scalar, use_heap> normalize_frobenius() const {
+			return (*this)/norm_frobenius();
 		}
-		Matrix<M, N, Scalar, use_heap> normalize() const { return euclidean_normalize(); }
+		Matrix<M, N, Scalar, use_heap> normalize_euclidean() const { return normalize_frobenius(); }
+		Matrix<M, N, Scalar, use_heap> normalize() const { return normalize_frobenius(); }
+
+		Matrix<M, N, Scalar, use_heap> normalize_min() const { return (*this)/Scalar(norm_min()); }
+		Matrix<M, N, Scalar, use_heap> normalize_max() const { return (*this)/Scalar(norm_max()); }
+		Matrix<M, N, Scalar, use_heap> normalize_minmax() const {
+			auto minimum = min();
+			auto maximum = max();
+			return ((*this) - Scalar(minimum))/(Scalar(maximum - minimum));
+		}
 	};
 
 	//column-vector
