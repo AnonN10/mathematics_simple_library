@@ -57,7 +57,7 @@ namespace Maths {
 			set(flat_list);
 		}
 		
-		Matrix<M, N, Scalar, use_heap>(Matrix<M, N, Scalar, use_heap> const&) = default;
+		Matrix(Matrix<M, N, Scalar, use_heap> const&) = default;
 		
 		//flat list is stored in memory as is due to row major order
 		void set(std::array<Scalar, M*N> flat_list) {
@@ -405,7 +405,7 @@ namespace Maths {
 		Scalar det() const { return determinant(); }
 		
 		Matrix<M, N, Scalar, use_heap> inverse_gauss_jordan() const {
-			return augment(Matrix<M, N, Scalar, use_heap>()).rref().split_right<N>();
+			return augment(Matrix<M, N, Scalar, use_heap>()).rref().template split_right<N>();
 		}
 		Matrix<M, N, Scalar, use_heap> inverse() const {
 			return adjugate()/determinant();
