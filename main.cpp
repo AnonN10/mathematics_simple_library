@@ -41,15 +41,15 @@ int main() {
 	print_matrix(a*c);
 	std::cout << "b*d:"<< std::endl;
 	print_matrix(b*d);
-	std::cout << "a.euclidean_normalize():" << std::endl;
-	print_matrix(a.euclidean_normalize());
-	std::cout << "c.euclidean_normalize():" << std::endl;
-	print_matrix(c.euclidean_normalize());
+	std::cout << "a.normalize_euclidean():" << std::endl;
+	print_matrix(a.normalize_euclidean());
+	std::cout << "c.normalize_euclidean():" << std::endl;
+	print_matrix(c.normalize_euclidean());
 	
 	std::cout << "m:" << std::endl;
 	print_matrix(m);
-	std::cout << "m.euclidean_normalize():" << std::endl;
-	print_matrix(m.euclidean_normalize());
+	std::cout << "m.normalize_euclidean():" << std::endl;
+	print_matrix(m.normalize_euclidean());
 	std::cout << "m.gramian():" << std::endl;
 	print_matrix(m.gramian());
 	

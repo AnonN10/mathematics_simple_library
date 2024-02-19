@@ -9,6 +9,7 @@
 #include <numbers>
 #include <complex>
 #include <array>
+#include <span>
 
 namespace Maths {
 	
@@ -60,19 +61,16 @@ namespace Maths {
 		Matrix(Matrix<M, N, Scalar, use_heap> const&) = default;
 		
 		//flat list is stored in memory as is due to row major order
-		void set(std::array<Scalar, M*N> flat_list) {
+		void set(const std::array<Scalar, M*N>& flat_list) {
+            set(std::span { flat_list });
+        }
+
+		void set(std::span<const Scalar, M*N> flat_list) {
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
 					data[m][n] = flat_list[N*m + n];
 		}
 
-		void set_v(std::vector<Scalar> flat_list) {
-			if(flat_list.size() < M*N) std::abort();
-			for(IndexType m = 0; m < M; ++m)
-				for(IndexType n = 0; n < N; ++n)
-					data[m][n] = flat_list[N*m + n];
-		}
-		
 		//builders
 		
 		void identity() {
