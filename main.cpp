@@ -113,6 +113,9 @@ int main() {
 	print_matrix(abc.split_right<1>().inverse_gauss_jordan());
 	std::cout << "abc.split_right<1>().inverse_gauss_jordan()*abc.split_right<1>():" << std::endl;
 	print_matrix(abc.split_right<1>().inverse_gauss_jordan()*abc.split_right<1>());
+
+	std::cout << "abc.normalize_minmax():" << std::endl;
+	print_matrix(abc.normalize_minmax());
 	
     return 0;
 }

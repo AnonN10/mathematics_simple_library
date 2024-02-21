@@ -79,11 +79,18 @@ namespace Maths {
 					data[m][n] = m==n? Scalar(1) : Scalar(0);
 		}
 		
-		void hadamard_identity() {
+		void identity_hadamard() {
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
 					data[m][n] = Scalar(1);
 		}
+
+		void identity_additive() {
+			for(IndexType m = 0; m < M; ++m)
+				for(IndexType n = 0; n < N; ++n)
+					data[m][n] = Scalar(0);
+		}
+		void zero() { identity_additive(); }
 		
 		void DFT() {
 			static_assert(N==M, "Operation undefined: DFT matrix must be square");
