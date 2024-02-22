@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cassert>
 #include <algorithm>
 #include <type_traits>
 #include <cstdint>
@@ -69,6 +70,11 @@ namespace Maths {
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
 					data[m][n] = flat_list[N*m + n];
+		}
+
+		void set(std::span<const Scalar> v) {
+			assert(v.size() == M*N);
+			set(std::span<const Scalar, M*N> { v });
 		}
 
 		//builders
@@ -337,30 +343,31 @@ namespace Maths {
 
 		//numerical stability improvements by Trolljanhorse
 		Matrix<M, N, Scalar, use_heap> reduced_row_echelon_form() const {
+			using std::abs;
+			
 			Matrix<M, N, Scalar, use_heap> result = *this;
 			for(IndexType lead = 0; lead < M; ++lead) {
 				Scalar divisor, multiplier;
-				//1. Find largest entry in column `lead`
+				//find largest entry in column `lead`
 				IndexType pivot = lead;
-				for (IndexType m = lead; m < M; ++m) {
-					if (std::abs(result[pivot][lead]) < std::abs(result[m][lead])) {
+				for (IndexType m = lead; m < M; ++m)
+					if (abs(result[pivot][lead]) < abs(result[m][lead]))
 						pivot = m;
-					}
-				}
-				//2. Swap row `lead` with row of largest column
-				for (IndexType n = 0; n < N; ++n) {
-					std::swap(result[pivot][n], result[lead][n]);
-				}
+				//swap row `lead` with row of largest column
+				if(pivot != lead)
+					for (IndexType n = 0; n < N; ++n)
+						std::swap(result[pivot][n], result[lead][n]);
 
 				for (IndexType m = 0; m < M; ++m) {
 					divisor = result[lead][lead];
-					multiplier = result[m][lead] / result[lead][lead];
-					for (IndexType n = 0; n < N; ++n) {
+					if(divisor == Scalar(0)) continue;
+
+					multiplier = result[m][lead] / divisor;
+					for (IndexType n = 0; n < N; ++n)
 						if (m == lead)
 							result[m][n] /= divisor;
 						else
 							result[m][n] -= result[lead][n] * multiplier;
-					}
 				}
 			}
 			return result;
@@ -456,10 +463,11 @@ namespace Maths {
 		}
 
 		ValueType norm_max() const {
+			using std::abs;
 			ValueType maximum = ValueType(0);
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n) {
-					ValueType magnitude = std::abs(data[m][n]);
+					ValueType magnitude = abs(data[m][n]);
 					if((m==0 && n==0) || maximum < magnitude)
 						maximum = magnitude;
 				}
@@ -467,10 +475,11 @@ namespace Maths {
 		}
 
 		ValueType norm_min() const {
+			using std::abs;
 			ValueType minimum = ValueType(0);
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n) {
-					ValueType magnitude = std::abs(data[m][n]);
+					ValueType magnitude = abs(data[m][n]);
 					if((m==0 && n==0) || minimum > magnitude)
 						minimum = magnitude;
 				}
@@ -478,11 +487,12 @@ namespace Maths {
 		}
 		
 		ValueType norm_frobenius() const {
+			using std::sqrt;
 			ValueType sum = ValueType(0);
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
 					sum += data[m][n]*data[m][n];
-			return std::sqrt(sum);
+			return sqrt(sum);
 		}
 		ValueType norm_euclidean() const { return norm_frobenius(); }
 		ValueType norm() const { return norm_frobenius(); }
