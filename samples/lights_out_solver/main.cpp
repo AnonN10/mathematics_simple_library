@@ -97,12 +97,11 @@ int main() {
 	auto M = A.augment(b);
 	//solve
 	M = M.rref();
-	//extract solution
+	//extract solution and turn back to 5x5 matrix
 	Matrix<5,5,GF2> solution;
 	solution.set(M.column(25).get_v());
-	//turn back to 5x5 matrix
-	//print
 
+	//print initial board state and its solution
 	std::cout << "board:" << std::endl;
 	print_matrix(board, 2);
 	std::cout << "solution:" << std::endl;

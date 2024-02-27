@@ -5,7 +5,11 @@
 #include <random>
 
 #include "mathematics_simple_library.hpp"
-#include "bmpmini.hpp"
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
 
 using namespace Maths;
 
@@ -59,8 +63,7 @@ int main() {
 	std::cout << "Transforming to time domain..." << std::endl;
 	mat = (mat_iDFT * mat) * mat_iDFT.transpose();
     
-    image::ImageView img{matdim, matdim, 1, nullptr};
-    std::vector<uint8_t> image_data(img.width * img.height);
+    std::vector<uint8_t> image_data(matdim * matdim);
 	
 	std::cout << "Reading out the data..." << std::endl;
     Matrix<matdim,matdim,complex_value_type,true> mat_out;
@@ -80,11 +83,8 @@ int main() {
 		}
 	);
 	
-    img.data = image_data.data();
-    
-	std::cout << "Saving to bluenoise.bmp..." << std::endl;
-    image::BMPMini bmp;
-    bmp.write(img, "bluenoise.bmp");
+	std::cout << "Saving to bluenoise.png..." << std::endl;
+	stbi_write_png("bluenoise.png", matdim, matdim, 1, image_data.data(), 0);
 
 	std::cout << "Done." << std::endl;
 	

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cassert>
+#include <cstdlib>
 #include <algorithm>
 #include <type_traits>
 #include <cstdint>
@@ -30,83 +31,104 @@ namespace Maths {
 	template<typename T>
 	constexpr bool is_power_of_two(T x) { return x && ((x & (x-1)) == 0); }
 
-	template<IndexType M, IndexType N, typename Scalar = float, bool use_heap = false>
+	//NOTE: may return negative zero
+	template<typename T>
+	constexpr T euclidean_remainder(T a, T b) {
+		assert(b != T(0));
+		T result;
+		if constexpr(std::is_integral_v<T>) {
+			result = a % b;
+		} else {
+			result = std::fmod(a,b);
+		}
+		if constexpr(!std::is_unsigned_v<T>) b = std::abs(b);
+		return result >= T(0) ? result : result + b;
+	}
+	template<typename T>
+	constexpr T euclidean_modulo(T a, T b) { return euclidean_remainder(a, b); }
+	template<typename T>
+	constexpr T eucmod(T a, T b) { return euclidean_remainder(a, b); }
+
+	template<IndexType M, IndexType N, typename Field = float, bool use_heap = false>
 	struct Matrix
 	{	
 		//row major: row M, column N
 		std::conditional_t<
 			use_heap,
-			std::vector<std::array<Scalar, N>>,
-			std::array<std::array<Scalar, N>, M>
+			std::vector<std::array<Field, N>>,
+			std::array<std::array<Field, N>, M>
 		> data;
 		
 		struct EmptyType {};
 		using ElementIndexed = std::conditional_t<
 			M == 1 || N == 1,
-			Scalar,
-			Matrix<M, 1, Scalar, use_heap>
+			Field,
+			Matrix<M, 1, Field, use_heap>
 		>;
-		using ValueType = value_type_t<Scalar>;
+		using ValueType = value_type_t<Field>;
 		
 		//constructors and setters
 		
 		Matrix() {
 			if constexpr(use_heap) data.resize(M);
-			identity();
+			if constexpr(std::is_constructible_v<Field, int>) identity();
 		}
-		Matrix(std::array<Scalar, M*N> flat_list) {
+		Matrix(std::array<Field, M*N> flat_list) {
 			if constexpr(use_heap) data.resize(M);
 			set(flat_list);
 		}
 		
-		Matrix(Matrix<M, N, Scalar, use_heap> const&) = default;
+		Matrix(Matrix<M, N, Field, use_heap> const&) = default;
 		
 		//flat list is stored in memory as is due to row major order
-		void set(const std::array<Scalar, M*N>& flat_list) {
+		void set(const std::array<Field, M*N>& flat_list) {
             set(std::span { flat_list });
         }
 
-		void set(std::span<const Scalar, M*N> flat_list) {
+		void set(std::span<const Field, M*N> flat_list) {
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
 					data[m][n] = flat_list[N*m + n];
 		}
 
-		void set(std::span<const Scalar> v) {
+		void set(std::span<const Field> v) {
 			assert(v.size() == M*N);
-			set(std::span<const Scalar, M*N> { v });
+			set(std::span<const Field, M*N> { v });
 		}
 
 		//builders
 		
 		void identity() {
+			static_assert(std::is_constructible_v<Field, int>, "Invalid operation: matrix element type is not constructible from int");
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
-					data[m][n] = m==n? Scalar(1) : Scalar(0);
+					data[m][n] = m==n? Field(1) : Field(0);
 		}
 		
 		void identity_hadamard() {
+			static_assert(std::is_constructible_v<Field, int>, "Invalid operation: matrix element type is not constructible from int");
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
-					data[m][n] = Scalar(1);
+					data[m][n] = Field(1);
 		}
 
 		void identity_additive() {
+			static_assert(std::is_constructible_v<Field, int>, "Invalid operation: matrix element type is not constructible from int");
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
-					data[m][n] = Scalar(0);
+					data[m][n] = Field(0);
 		}
 		void zero() { identity_additive(); }
 		
 		void DFT() {
 			static_assert(N==M, "Operation undefined: DFT matrix must be square");
-			static_assert(is_complex_v<Scalar>, "Operation undefined: DFT matrix must be complex");
+			static_assert(is_complex_v<Field>, "Operation undefined: DFT matrix must be complex");
 			
-			constexpr Scalar i = Scalar(ValueType(0), ValueType(1));
+			constexpr Field i = Field(ValueType(0), ValueType(1));
 			constexpr ValueType pi = std::numbers::pi_v<ValueType>;
 			
 			const ValueType norm = ValueType(1)/std::sqrt(ValueType(N));
-			const Scalar omega = std::exp(ValueType(-2) * pi * i / Scalar(ValueType(N)));
+			const Field omega = std::exp(ValueType(-2) * pi * i / Field(ValueType(N)));
 			
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
@@ -127,8 +149,8 @@ namespace Maths {
 					1, -1,
 				});
 			} else {
-				Matrix<2, 2, Scalar, use_heap> H_2;
-				Matrix<M/2, N/2, Scalar, use_heap> H_n;
+				Matrix<2, 2, Field, use_heap> H_2;
+				Matrix<M/2, N/2, Field, use_heap> H_n;
 				H_n.sylvester_walsh();
 				H_2.sylvester_walsh();
 				(*this) = H_2.kronecker_product(H_n);
@@ -137,39 +159,39 @@ namespace Maths {
 		
 		//getters
 
-		std::array<Scalar, M*N> get() {
-			std::array<Scalar, M*N> flat_list;
+		std::array<Field, M*N> get() {
+			std::array<Field, M*N> flat_list;
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
 					flat_list[N*m + n] = data[m][n];
 			return flat_list;
 		}
 
-		std::vector<Scalar> get_v() {
-			std::vector<Scalar> flat_list(M*N);
+		std::vector<Field> get_v() {
+			std::vector<Field> flat_list(M*N);
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
 					flat_list[N*m + n] = data[m][n];
 			return flat_list;
 		}
 		
-		Matrix<1, N, Scalar, use_heap> row(IndexType m) const {
-			Matrix<1, N, Scalar, use_heap> result;
+		Matrix<1, N, Field, use_heap> row(IndexType m) const {
+			Matrix<1, N, Field, use_heap> result;
 			for(IndexType n = 0; n < N; ++n)
 				result[0][n] = data[m][n];
 			return result;
 		}
 		
-		Matrix<M, 1, Scalar, use_heap> column(IndexType n) const {
-			Matrix<M, 1, Scalar, use_heap> result;
+		Matrix<M, 1, Field, use_heap> column(IndexType n) const {
+			Matrix<M, 1, Field, use_heap> result;
 			for(IndexType m = 0; m < M; ++m)
 				result.data[m][0] = data[m][n];
 			return result;
 		}
 
 		template<IndexType N_first>
-		Matrix<M, N-N_first, Scalar, use_heap> split_right() const {
-			Matrix<M, N-N_first, Scalar, use_heap> result;
+		Matrix<M, N-N_first, Field, use_heap> split_right() const {
+			Matrix<M, N-N_first, Field, use_heap> result;
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N-N_first; ++n)
 					result[m][n] = data[m][n+N_first];
@@ -196,15 +218,15 @@ namespace Maths {
 			else return row(i);
 		}
 		
-		Scalar operator()(IndexType row, IndexType column) {
+		Field operator()(IndexType row, IndexType column) {
 			return data[row][column];
 		}
 		
 		auto&& operator[](IndexType m) { return data[m]; }
 		const auto operator[](IndexType m) const { return data[m]; }
 		
-		Matrix<M, N, Scalar, use_heap> operator-() const {
-			Matrix<M, N, Scalar, use_heap> result;
+		Matrix<M, N, Field, use_heap> operator-() const {
+			Matrix<M, N, Field, use_heap> result;
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
 					result.data[m][n] = -data[m][n];
@@ -212,13 +234,13 @@ namespace Maths {
 		}
 		
 		template<IndexType M_other, IndexType N_other, bool use_heap_other>
-		Matrix<M, N_other, Scalar, use_heap || use_heap_other> operator*(const Matrix<M_other, N_other, Scalar, use_heap_other>& other) const {
+		Matrix<M, N_other, Field, use_heap || use_heap_other> operator*(const Matrix<M_other, N_other, Field, use_heap_other>& other) const {
 			static_assert(N==M_other, "Operation undefined: for matrix multiplication the number of columns of the first must match the number of rows of the second");
-			Matrix<M, N_other, Scalar, use_heap || use_heap_other> result;
+			Matrix<M, N_other, Field, use_heap || use_heap_other> result;
 			//matrix multiplication is essentially a collection of dot product permutations of
 			//rows of the first and columnts of the second, therefore we can transpose the second
 			//to perform just the dot products of row permutations
-			Matrix<N_other, M_other, Scalar, use_heap_other> other_T = other.transpose();
+			Matrix<N_other, M_other, Field, use_heap_other> other_T = other.transpose();
 			//for each element of the resulting matrix
 			for(IndexType m = 0; m < M; ++m) {
 				for(decltype(N_other) n = 0; n < N_other; ++n) {
@@ -226,7 +248,7 @@ namespace Maths {
 					result.data[m][n] = std::transform_reduce(
 											std::begin(this->data[m]), std::end(this->data[m]),
 											std::begin(other_T.data[n]),
-											Scalar(0), std::plus<>{}, std::multiplies<>{}
+											Field(0), std::plus<>{}, std::multiplies<>{}
 										);
 				}
 			}
@@ -234,13 +256,13 @@ namespace Maths {
 		}
 		
 		template<IndexType M_other, IndexType N_other, bool use_heap_other>
-		Matrix<M, N_other, Scalar, use_heap> operator/(const Matrix<M_other, N_other, Scalar, use_heap_other>& other) const {
+		Matrix<M, N_other, Field, use_heap> operator/(const Matrix<M_other, N_other, Field, use_heap_other>& other) const {
 			return other.inverse()*(*this);
 		}
 		
 		template<bool use_heap_other>
-		Matrix<M, N, Scalar, use_heap> operator+(const Matrix<M, N, Scalar, use_heap_other>& other) const {
-			Matrix<M, N, Scalar, use_heap> result;
+		Matrix<M, N, Field, use_heap> operator+(const Matrix<M, N, Field, use_heap_other>& other) const {
+			Matrix<M, N, Field, use_heap> result;
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
 					result.data[m][n] = data[m][n]+other[m][n];
@@ -248,36 +270,36 @@ namespace Maths {
 		}
 		
 		template<bool use_heap_other>
-		Matrix<M, N, Scalar, use_heap> operator-(const Matrix<M, N, Scalar, use_heap_other>& other) const {
+		Matrix<M, N, Field, use_heap> operator-(const Matrix<M, N, Field, use_heap_other>& other) const {
 			return (*this)+(-other);
 		}
 		
-		Matrix<M, N, Scalar, use_heap> operator*(Scalar scalar) const {
-			Matrix<M, N, Scalar, use_heap> result;
+		Matrix<M, N, Field, use_heap> operator*(Field scalar) const {
+			Matrix<M, N, Field, use_heap> result;
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
 					result.data[m][n] = data[m][n]*scalar;
 			return result;
 		}
 		
-		Matrix<M, N, Scalar, use_heap> operator/(Scalar scalar) const {
-			Matrix<M, N, Scalar, use_heap> result;
+		Matrix<M, N, Field, use_heap> operator/(Field scalar) const {
+			Matrix<M, N, Field, use_heap> result;
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
 					result.data[m][n] = data[m][n]/scalar;
 			return result;
 		}
 
-		Matrix<M, N, Scalar, use_heap> operator+(Scalar scalar) const {
-			Matrix<M, N, Scalar, use_heap> result;
+		Matrix<M, N, Field, use_heap> operator+(Field scalar) const {
+			Matrix<M, N, Field, use_heap> result;
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
 					result.data[m][n] = data[m][n]+scalar;
 			return result;
 		}
 		
-		Matrix<M, N, Scalar, use_heap> operator-(Scalar scalar) const {
-			Matrix<M, N, Scalar, use_heap> result;
+		Matrix<M, N, Field, use_heap> operator-(Field scalar) const {
+			Matrix<M, N, Field, use_heap> result;
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
 					result.data[m][n] = data[m][n]-scalar;
@@ -287,9 +309,9 @@ namespace Maths {
 		//methods
 
 		template<IndexType M_other, IndexType N_other, bool use_heap_other>
-		Matrix<M, N+N_other, Scalar, use_heap || use_heap_other> augment(const Matrix<M_other, N_other, Scalar, use_heap_other>& other) const {
+		Matrix<M, N+N_other, Field, use_heap || use_heap_other> augment(const Matrix<M_other, N_other, Field, use_heap_other>& other) const {
 			static_assert(M==M_other, "Operation undefined: matrix can only be augmented with a matrix with the same amount of rows");
-			Matrix<M, N+N_other, Scalar, use_heap || use_heap_other> result;
+			Matrix<M, N+N_other, Field, use_heap || use_heap_other> result;
 			//copy current's columns
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
@@ -302,8 +324,8 @@ namespace Maths {
 		}
 		
 		template<bool use_heap_other>
-		Matrix<M, N, Scalar, use_heap> hadamard_product(const Matrix<M, N, Scalar, use_heap_other>& other) const {
-			Matrix<M, N, Scalar, use_heap> result;
+		Matrix<M, N, Field, use_heap> hadamard_product(const Matrix<M, N, Field, use_heap_other>& other) const {
+			Matrix<M, N, Field, use_heap> result;
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
 					result.data[m][n] = data[m][n]*other[m][n];
@@ -311,8 +333,8 @@ namespace Maths {
 		}
 		
 		template<IndexType M_other, IndexType N_other, bool use_heap_other>
-		Matrix<M*M_other, N*N_other, Scalar, use_heap> kronecker_product(const Matrix<M_other, N_other, Scalar, use_heap_other>& other) const {
-			Matrix<M*M_other, N*N_other, Scalar, use_heap> result;
+		Matrix<M*M_other, N*N_other, Field, use_heap> kronecker_product(const Matrix<M_other, N_other, Field, use_heap_other>& other) const {
+			Matrix<M*M_other, N*N_other, Field, use_heap> result;
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
 					for(IndexType m_other = 0; m_other < M_other; ++m_other)
@@ -321,7 +343,7 @@ namespace Maths {
 			return result;
 		}
 		
-		Scalar dot(const Matrix<M, N, Scalar, use_heap>& other) {
+		Field dot(const Matrix<M, N, Field, use_heap>& other) {
 			static_assert(M==1||N==1, "Operation undefined: dot product is defined only for vectors and covectors");
 			//vector
 			if constexpr(N==1) return (this->transpose() * other)(0);
@@ -329,25 +351,25 @@ namespace Maths {
 			else return this->transpose().dot(other.transpose());
 		}
 		
-		Matrix<N, M, Scalar, use_heap> transpose() const {
-			Matrix<N, M, Scalar, use_heap> result;
+		Matrix<N, M, Field, use_heap> transpose() const {
+			Matrix<N, M, Field, use_heap> result;
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
 					result.data[n][m] = this->data[m][n];
 			return result;
 		}
 
-		Matrix<N, M, Scalar, use_heap> transpose_hermitian() const {
+		Matrix<N, M, Field, use_heap> transpose_hermitian() const {
 			return conjugate().transpose();
 		}
 
 		//numerical stability improvements by Trolljanhorse
-		Matrix<M, N, Scalar, use_heap> reduced_row_echelon_form() const {
+		Matrix<M, N, Field, use_heap> reduced_row_echelon_form() const {
 			using std::abs;
 			
-			Matrix<M, N, Scalar, use_heap> result = *this;
+			Matrix<M, N, Field, use_heap> result = *this;
 			for(IndexType lead = 0; lead < M; ++lead) {
-				Scalar divisor, multiplier;
+				Field divisor, multiplier;
 				//find largest entry in column `lead`
 				IndexType pivot = lead;
 				for (IndexType m = lead; m < M; ++m)
@@ -360,7 +382,7 @@ namespace Maths {
 
 				for (IndexType m = 0; m < M; ++m) {
 					divisor = result[lead][lead];
-					if(divisor == Scalar(0)) continue;
+					if(divisor == Field(0)) continue;
 
 					multiplier = result[m][lead] / divisor;
 					for (IndexType n = 0; n < N; ++n)
@@ -372,10 +394,10 @@ namespace Maths {
 			}
 			return result;
 		}
-		Matrix<M, N, Scalar, use_heap> rref() const { return reduced_row_echelon_form(); }
+		Matrix<M, N, Field, use_heap> rref() const { return reduced_row_echelon_form(); }
 		
-		Matrix<M-1, N-1, Scalar, use_heap> submatrix(IndexType m, IndexType n) const {
-			Matrix<M-1, N-1, Scalar, use_heap> result;
+		Matrix<M-1, N-1, Field, use_heap> submatrix(IndexType m, IndexType n) const {
+			Matrix<M-1, N-1, Field, use_heap> result;
 			for(IndexType m_src = 0, m_dest = 0; m_src < M; ++m_src) {
 				if(m_src == m) continue;
 				for(IndexType n_src = 0, n_dest = 0; n_src < N; ++n_src) {
@@ -388,74 +410,74 @@ namespace Maths {
 			return result;
 		}
 		
-		Matrix<M, N, Scalar, use_heap> cofactor() const {
-			Matrix<M, N, Scalar, use_heap> result;
+		Matrix<M, N, Field, use_heap> cofactor() const {
+			Matrix<M, N, Field, use_heap> result;
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
-					result.data[m][n] = Scalar((m+n)&1?-1:1)*submatrix(m,n).determinant();
+					result.data[m][n] = Field((m+n)&1?-1:1)*submatrix(m,n).determinant();
 			return result;
 		}
 		
-		Matrix<M, N, Scalar, use_heap> adjugate() const {
+		Matrix<M, N, Field, use_heap> adjugate() const {
 			return cofactor().transpose();
 		}
 		
-		Scalar determinant() const {
+		Field determinant() const {
 			static_assert(M==N, "Operation undefined: determinant is only defined for square matrices");
 			if constexpr(M==1){
 				return data[0][0];
 			} else if constexpr(M==2) {
 				return data[0][0]*data[1][1] - data[0][1]*data[1][0];
 			} else {
-				Scalar result = Scalar(0);
+				Field result = Field(0);
 				for (int n = 0; n < N; n++)
-					result += data[0][n] * Scalar(n&1?-1:1)*submatrix(0,n).determinant();
+					result += data[0][n] * Field(n&1?-1:1)*submatrix(0,n).determinant();
 				return result;
 			}
-			return Scalar(0);
+			return Field(0);
 		}
-		Scalar det() const { return determinant(); }
+		Field det() const { return determinant(); }
 		
-		Matrix<M, N, Scalar, use_heap> inverse_gauss_jordan() const {
-			return augment(Matrix<M, N, Scalar, use_heap>()).rref().template split_right<N>();
+		Matrix<M, N, Field, use_heap> inverse_gauss_jordan() const {
+			return augment(Matrix<M, N, Field, use_heap>()).rref().template split_right<N>();
 		}
-		Matrix<M, N, Scalar, use_heap> inverse() const {
+		Matrix<M, N, Field, use_heap> inverse() const {
 			return adjugate()/determinant();
 		}
-		Matrix<M, N, Scalar, use_heap> inv() const { return inverse(); }
+		Matrix<M, N, Field, use_heap> inv() const { return inverse(); }
 		
-		Matrix<M, N, Scalar, use_heap> conjugate() const {
-			if constexpr(is_complex_v<Scalar>) {
-				Matrix<M, N, Scalar, use_heap> result;
+		Matrix<M, N, Field, use_heap> conjugate() const {
+			if constexpr(is_complex_v<Field>) {
+				Matrix<M, N, Field, use_heap> result;
 				for(IndexType m = 0; m < M; ++m)
 					for(IndexType n = 0; n < N; ++n)
 						result[m][n] = std::conj(data[m][n]);
 				return result;
 			} else return *this;
 		}
-		Matrix<M, N, Scalar, use_heap> conj() const { return conjugate(); }
+		Matrix<M, N, Field, use_heap> conj() const { return conjugate(); }
 		
-		Matrix<N, N, Scalar, use_heap> gramian() const {
+		Matrix<N, N, Field, use_heap> gramian() const {
 			return conjugate().transpose()*(*this);
 		}
-		Matrix<N, N, Scalar, use_heap> gram() const { return gramian(); }
+		Matrix<N, N, Field, use_heap> gram() const { return gramian(); }
 
-		Scalar max() const {
-			Scalar maximum = Scalar(0);
+		Field max() const {
+			Field maximum = Field(0);
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n) {
-					Scalar value = data[m][n];
+					Field value = data[m][n];
 					if((m==0 && n==0) || maximum < value)
 						maximum = value;
 				}
 			return maximum;
 		}
 
-		Scalar min() const {
-			Scalar minimum = Scalar(0);
+		Field min() const {
+			Field minimum = Field(0);
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n) {
-					Scalar value = data[m][n];
+					Field value = data[m][n];
 					if((m==0 && n==0) || minimum > value)
 						minimum = value;
 				}
@@ -497,27 +519,27 @@ namespace Maths {
 		ValueType norm_euclidean() const { return norm_frobenius(); }
 		ValueType norm() const { return norm_frobenius(); }
 		
-		Matrix<M, N, Scalar, use_heap> normalize_frobenius() const {
+		Matrix<M, N, Field, use_heap> normalize_frobenius() const {
 			return (*this)/norm_frobenius();
 		}
-		Matrix<M, N, Scalar, use_heap> normalize_euclidean() const { return normalize_frobenius(); }
-		Matrix<M, N, Scalar, use_heap> normalize() const { return normalize_frobenius(); }
+		Matrix<M, N, Field, use_heap> normalize_euclidean() const { return normalize_frobenius(); }
+		Matrix<M, N, Field, use_heap> normalize() const { return normalize_frobenius(); }
 
-		Matrix<M, N, Scalar, use_heap> normalize_min() const { return (*this)/Scalar(norm_min()); }
-		Matrix<M, N, Scalar, use_heap> normalize_max() const { return (*this)/Scalar(norm_max()); }
-		Matrix<M, N, Scalar, use_heap> normalize_minmax() const {
+		Matrix<M, N, Field, use_heap> normalize_min() const { return (*this)/Field(norm_min()); }
+		Matrix<M, N, Field, use_heap> normalize_max() const { return (*this)/Field(norm_max()); }
+		Matrix<M, N, Field, use_heap> normalize_minmax() const {
 			auto minimum = min();
 			auto maximum = max();
-			return ((*this) - Scalar(minimum))/(Scalar(maximum - minimum));
+			return ((*this) - Field(minimum))/(Field(maximum - minimum));
 		}
 	};
 
 	//column-vector
-	template<IndexType M, typename Scalar = float, bool use_heap = false>
-	using Vector = Matrix<M, 1, Scalar, use_heap>;
+	template<IndexType M, typename Field = float, bool use_heap = false>
+	using Vector = Matrix<M, 1, Field, use_heap>;
 
 	//row-vector
-	template<IndexType N, typename Scalar = float, bool use_heap = false>
-	using Covector = Matrix<1, N, Scalar, use_heap>;
+	template<IndexType N, typename Field = float, bool use_heap = false>
+	using Covector = Matrix<1, N, Field, use_heap>;
 
 } // namespace Maths
