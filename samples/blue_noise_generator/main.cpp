@@ -34,24 +34,24 @@ int main() {
 	std::cout << "Generating white noise matrix..." << std::endl;
 	for(IndexType m = 0; m < matdim; ++m)
 		for(IndexType n = 0; n < matdim; ++n) {
-			mat[m][n] = random_range(complex_value_type(0), complex_value_type(1));
+			mat[m, n] = random_range(complex_value_type(0), complex_value_type(1));
 		}
 	std::cout << "Generating filter matrix..." << std::endl;
 	auto sqr = [](auto x) { return x*x; };
 	for(IndexType m = 0; m < matdim; ++m)
 		for(IndexType n = 0; n < matdim; ++n) {
-			mat_filter[m][n] = complex_value_type(1);
+			mat_filter[m, n] = complex_value_type(1);
 			complex_value_type radius = matdim/4;
-			mat_filter[m][n] *= std::sqrt(
+			mat_filter[m, n] *= std::sqrt(
 				static_cast<float>(sqr(static_cast<complex_value_type>(n)) + sqr(static_cast<complex_value_type>(m)))
 			) > radius? 1.0 : 0.0;
-			mat_filter[m][n] *= std::sqrt(
+			mat_filter[m, n] *= std::sqrt(
 				static_cast<float>(sqr(static_cast<complex_value_type>(matdim - n)) + sqr(static_cast<complex_value_type>(m)))
 			) > radius? 1.0 : 0.0;
-			mat_filter[m][n] *= std::sqrt(
+			mat_filter[m, n] *= std::sqrt(
 				static_cast<float>(sqr(static_cast<complex_value_type>(n)) + sqr(static_cast<complex_value_type>(matdim - m)))
 			) > radius? 1.0 : 0.0;
-			mat_filter[m][n] *= std::sqrt(
+			mat_filter[m, n] *= std::sqrt(
 				static_cast<float>(sqr(static_cast<complex_value_type>(matdim - n)) + sqr(static_cast<complex_value_type>(matdim - m)))
 			) > radius? 1.0 : 0.0;
 		}
@@ -69,7 +69,7 @@ int main() {
     Matrix<matdim,matdim,complex_value_type,true> mat_out;
 	for(IndexType m = 0; m < matdim; ++m)
 		for(IndexType n = 0; n < matdim; ++n) {
-			mat_out[m][n] = mat[m][n].real();
+			mat_out[m, n] = mat[m, n].real();
 		}
 	std::cout << "Transforming to image space..." << std::endl;
 	mat_out = mat_out.normalize_minmax();

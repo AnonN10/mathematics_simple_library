@@ -8,6 +8,6 @@ target_include_directories(
     ../../
     ../common/
 )
-set_property(TARGET JumpFloodingAlgorithm PROPERTY CXX_STANDARD 20)
+set_property(TARGET JumpFloodingAlgorithm PROPERTY CXX_STANDARD 23)
 set_property(TARGET JumpFloodingAlgorithm PROPERTY CXX_STANDARD_REQUIRED On)
 set_property(TARGET JumpFloodingAlgorithm PROPERTY CXX_EXTENSIONS Off)

@@ -6,7 +6,7 @@ project(Application)
 # add the executable
 add_executable(Application main.cpp)
 
-set_property(TARGET Application PROPERTY CXX_STANDARD 20)
+set_property(TARGET Application PROPERTY CXX_STANDARD 23)
 set_property(TARGET Application PROPERTY CXX_STANDARD_REQUIRED On)
 set_property(TARGET Application PROPERTY CXX_EXTENSIONS Off)
 

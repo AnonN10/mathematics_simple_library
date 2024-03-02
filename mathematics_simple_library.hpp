@@ -11,6 +11,8 @@
 #include <numbers>
 #include <complex>
 #include <array>
+#include <iterator>
+#include <cstddef>
 #include <span>
 
 namespace Maths {
@@ -52,11 +54,11 @@ namespace Maths {
 	template<IndexType M, IndexType N, typename Field = float, bool use_heap = false>
 	struct Matrix
 	{	
-		//row major: row M, column N
+		//row major data layout: row M, column N
 		std::conditional_t<
 			use_heap,
-			std::vector<std::array<Field, N>>,
-			std::array<std::array<Field, N>, M>
+			std::vector<Field>,
+			std::array<Field, M*N>
 		> data;
 		
 		struct EmptyType {};
@@ -70,11 +72,11 @@ namespace Maths {
 		//constructors and setters
 		
 		Matrix() {
-			if constexpr(use_heap) data.resize(M);
+			if constexpr(use_heap) data.resize(M*N);
 			if constexpr(std::is_constructible_v<Field, int>) identity();
 		}
 		Matrix(std::array<Field, M*N> flat_list) {
-			if constexpr(use_heap) data.resize(M);
+			if constexpr(use_heap) data.resize(M*N);
 			set(flat_list);
 		}
 		
@@ -88,7 +90,7 @@ namespace Maths {
 		void set(std::span<const Field, M*N> flat_list) {
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
-					data[m][n] = flat_list[N*m + n];
+					(*this)[m, n] = flat_list[N*m + n];
 		}
 
 		void set(std::span<const Field> v) {
@@ -102,21 +104,21 @@ namespace Maths {
 			static_assert(std::is_constructible_v<Field, int>, "Invalid operation: matrix element type is not constructible from int");
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
-					data[m][n] = m==n? Field(1) : Field(0);
+					(*this)[m, n] = m==n? Field(1) : Field(0);
 		}
 		
 		void identity_hadamard() {
 			static_assert(std::is_constructible_v<Field, int>, "Invalid operation: matrix element type is not constructible from int");
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
-					data[m][n] = Field(1);
+					(*this)[m, n] = Field(1);
 		}
 
 		void identity_additive() {
 			static_assert(std::is_constructible_v<Field, int>, "Invalid operation: matrix element type is not constructible from int");
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
-					data[m][n] = Field(0);
+					(*this)[m, n] = Field(0);
 		}
 		void zero() { identity_additive(); }
 		
@@ -132,7 +134,7 @@ namespace Maths {
 			
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
-					data[m][n] = std::pow(omega, ValueType(n*m));
+					(*this)[m, n] = std::pow(omega, ValueType(n*m))*norm;
 		}
 		
 		void sylvester_walsh() {
@@ -141,7 +143,7 @@ namespace Maths {
 			
 			if constexpr(N==1) {
 				//Hadamard order 1
-				data[0][0] = 1;
+				(*this)[0] = 1;
 			} else if constexpr(N==2) {
 				//Hadamard order 2
 				set({
@@ -157,13 +159,13 @@ namespace Maths {
 			}
 		}
 		
-		//getters
+		//getters and iterators
 
 		std::array<Field, M*N> get() {
 			std::array<Field, M*N> flat_list;
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
-					flat_list[N*m + n] = data[m][n];
+					flat_list[N*m + n] = (*this)[m, n];
 			return flat_list;
 		}
 
@@ -171,21 +173,21 @@ namespace Maths {
 			std::vector<Field> flat_list(M*N);
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
-					flat_list[N*m + n] = data[m][n];
+					flat_list[N*m + n] = (*this)[m, n];
 			return flat_list;
 		}
 		
 		Matrix<1, N, Field, use_heap> row(IndexType m) const {
 			Matrix<1, N, Field, use_heap> result;
 			for(IndexType n = 0; n < N; ++n)
-				result[0][n] = data[m][n];
+				result[0, n] = (*this)[m, n];
 			return result;
 		}
 		
 		Matrix<M, 1, Field, use_heap> column(IndexType n) const {
 			Matrix<M, 1, Field, use_heap> result;
 			for(IndexType m = 0; m < M; ++m)
-				result.data[m][0] = data[m][n];
+				result[m, 0] = (*this)[m, n];
 			return result;
 		}
 
@@ -194,7 +196,7 @@ namespace Maths {
 			Matrix<M, N-N_first, Field, use_heap> result;
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N-N_first; ++n)
-					result[m][n] = data[m][n+N_first];
+					result[m, n] = (*this)[m, n+N_first];
 			return result;
 		}
 		
@@ -205,31 +207,33 @@ namespace Maths {
 			Matrix<M, N, T, use_heap> result;
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
-					result[m][n] = T(data[m][n]);
+					result[m, n] = T((*this)[m, n]);
 			return result;
 		}
 		
 		ElementIndexed operator()(IndexType i) {
 			//vector: index first column
-			if constexpr(N == 1) return data[i][0];
+			if constexpr(N == 1) return (*this)[i, 0];
 			//covector: index first row
-			else if constexpr(M == 1) return data[0][i];
+			else if constexpr(M == 1) return (*this)[0, i];
 			//matrix: index rows
 			else return row(i);
 		}
 		
 		Field operator()(IndexType row, IndexType column) {
-			return data[row][column];
+			return (*this)[row, column];
 		}
 		
-		auto&& operator[](IndexType m) { return data[m]; }
-		const auto operator[](IndexType m) const { return data[m]; }
+		auto&& operator[](IndexType i) { return data[i]; }
+		const auto operator[](IndexType i) const { return data[i]; }
+		auto&& operator[](IndexType m, IndexType n) { return data[N*m+n]; }
+		const auto operator[](IndexType m, IndexType n) const { return data[N*m+n]; }
 		
 		Matrix<M, N, Field, use_heap> operator-() const {
 			Matrix<M, N, Field, use_heap> result;
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
-					result.data[m][n] = -data[m][n];
+					result[m, n] = -(*this)[m, n];
 			return result;
 		}
 		
@@ -240,16 +244,16 @@ namespace Maths {
 			//matrix multiplication is essentially a collection of dot product permutations of
 			//rows of the first and columnts of the second, therefore we can transpose the second
 			//to perform just the dot products of row permutations
-			Matrix<N_other, M_other, Field, use_heap_other> other_T = other.transpose();
+			auto other_T = other.transpose();
 			//for each element of the resulting matrix
 			for(IndexType m = 0; m < M; ++m) {
 				for(decltype(N_other) n = 0; n < N_other; ++n) {
 					//dot product
-					result.data[m][n] = std::transform_reduce(
-											std::begin(this->data[m]), std::end(this->data[m]),
-											std::begin(other_T.data[n]),
-											Field(0), std::plus<>{}, std::multiplies<>{}
-										);
+					result[m, n] = std::transform_reduce(
+						this->data.begin()+N*m, this->data.begin()+N*(m+1),
+						other_T.data.begin()+M_other*n,
+						Field(0), std::plus<>{}, std::multiplies<>{}
+					);
 				}
 			}
 			return result;
@@ -265,7 +269,7 @@ namespace Maths {
 			Matrix<M, N, Field, use_heap> result;
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
-					result.data[m][n] = data[m][n]+other[m][n];
+					result[m, n] = (*this)[m, n]+other[m, n];
 			return result;
 		}
 		
@@ -278,7 +282,7 @@ namespace Maths {
 			Matrix<M, N, Field, use_heap> result;
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
-					result.data[m][n] = data[m][n]*scalar;
+					result[m, n] = (*this)[m, n]*scalar;
 			return result;
 		}
 		
@@ -286,7 +290,7 @@ namespace Maths {
 			Matrix<M, N, Field, use_heap> result;
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
-					result.data[m][n] = data[m][n]/scalar;
+					result[m, n] = (*this)[m, n]/scalar;
 			return result;
 		}
 
@@ -294,7 +298,7 @@ namespace Maths {
 			Matrix<M, N, Field, use_heap> result;
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
-					result.data[m][n] = data[m][n]+scalar;
+					result[m, n] = (*this)[m, n]+scalar;
 			return result;
 		}
 		
@@ -302,7 +306,7 @@ namespace Maths {
 			Matrix<M, N, Field, use_heap> result;
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
-					result.data[m][n] = data[m][n]-scalar;
+					result[m, n] = (*this)[m, n]-scalar;
 			return result;
 		}
 		
@@ -315,11 +319,11 @@ namespace Maths {
 			//copy current's columns
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
-					result[m][n] = data[m][n];
+					result[m, n] = (*this)[m, n];
 			//copy other's columns
 			for(IndexType m = 0; m < M_other; ++m)
 				for(IndexType n = 0; n < N_other; ++n)
-					result[m][N+n] = other[m][n];
+					result[m, N+n] = other[m, n];
 			return result;
 		}
 		
@@ -328,7 +332,7 @@ namespace Maths {
 			Matrix<M, N, Field, use_heap> result;
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
-					result.data[m][n] = data[m][n]*other[m][n];
+					result[m, n] = (*this)[m, n]*other[m, n];
 			return result;
 		}
 		
@@ -339,7 +343,7 @@ namespace Maths {
 				for(IndexType n = 0; n < N; ++n)
 					for(IndexType m_other = 0; m_other < M_other; ++m_other)
 						for(IndexType n_other = 0; n_other < N_other; ++n_other)
-							result.data[m*M_other+m_other][n*N_other+n_other] = data[m][n]*other[m_other][n_other];
+							result[m*M_other+m_other, n*N_other+n_other] = (*this)[m, n]*other[m_other, n_other];
 			return result;
 		}
 		
@@ -355,7 +359,7 @@ namespace Maths {
 			Matrix<N, M, Field, use_heap> result;
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
-					result.data[n][m] = this->data[m][n];
+					result[n, m] = (*this)[m, n];
 			return result;
 		}
 
@@ -373,23 +377,23 @@ namespace Maths {
 				//find largest entry in column `lead`
 				IndexType pivot = lead;
 				for (IndexType m = lead; m < M; ++m)
-					if (abs(result[pivot][lead]) < abs(result[m][lead]))
+					if (abs(result[pivot, lead]) < abs(result[m, lead]))
 						pivot = m;
 				//swap row `lead` with row of largest column
 				if(pivot != lead)
 					for (IndexType n = 0; n < N; ++n)
-						std::swap(result[pivot][n], result[lead][n]);
+						std::swap(result[pivot, n], result[lead, n]);
 
 				for (IndexType m = 0; m < M; ++m) {
-					divisor = result[lead][lead];
+					divisor = result[lead, lead];
 					if(divisor == Field(0)) continue;
 
-					multiplier = result[m][lead] / divisor;
+					multiplier = result[m, lead] / divisor;
 					for (IndexType n = 0; n < N; ++n)
 						if (m == lead)
-							result[m][n] /= divisor;
+							result[m, n] /= divisor;
 						else
-							result[m][n] -= result[lead][n] * multiplier;
+							result[m, n] -= result[lead, n] * multiplier;
 				}
 			}
 			return result;
@@ -402,7 +406,7 @@ namespace Maths {
 				if(m_src == m) continue;
 				for(IndexType n_src = 0, n_dest = 0; n_src < N; ++n_src) {
 					if(n_src == n) continue;
-					result.data[m_dest][n_dest] = this->data[m_src][n_src];
+					result[m_dest, n_dest] = (*this)[m_src, n_src];
 					++n_dest;
 				}
 				++m_dest;
@@ -414,7 +418,7 @@ namespace Maths {
 			Matrix<M, N, Field, use_heap> result;
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
-					result.data[m][n] = Field((m+n)&1?-1:1)*submatrix(m,n).determinant();
+					result[m, n] = Field((m+n)&1?-1:1)*submatrix(m,n).determinant();
 			return result;
 		}
 		
@@ -425,13 +429,13 @@ namespace Maths {
 		Field determinant() const {
 			static_assert(M==N, "Operation undefined: determinant is only defined for square matrices");
 			if constexpr(M==1){
-				return data[0][0];
+				return (*this)[0, 0];
 			} else if constexpr(M==2) {
-				return data[0][0]*data[1][1] - data[0][1]*data[1][0];
+				return (*this)[0, 0]*(*this)[1, 1] - (*this)[0, 1]*(*this)[1, 0];
 			} else {
 				Field result = Field(0);
 				for (int n = 0; n < N; n++)
-					result += data[0][n] * Field(n&1?-1:1)*submatrix(0,n).determinant();
+					result += (*this)[0, n] * Field(n&1?-1:1)*submatrix(0,n).determinant();
 				return result;
 			}
 			return Field(0);
@@ -451,7 +455,7 @@ namespace Maths {
 				Matrix<M, N, Field, use_heap> result;
 				for(IndexType m = 0; m < M; ++m)
 					for(IndexType n = 0; n < N; ++n)
-						result[m][n] = std::conj(data[m][n]);
+						result[m, n] = std::conj((*this)[m, n]);
 				return result;
 			} else return *this;
 		}
@@ -466,7 +470,7 @@ namespace Maths {
 			Field maximum = Field(0);
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n) {
-					Field value = data[m][n];
+					Field value = (*this)[m, n];
 					if((m==0 && n==0) || maximum < value)
 						maximum = value;
 				}
@@ -477,7 +481,7 @@ namespace Maths {
 			Field minimum = Field(0);
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n) {
-					Field value = data[m][n];
+					Field value = (*this)[m, n];
 					if((m==0 && n==0) || minimum > value)
 						minimum = value;
 				}
@@ -489,7 +493,7 @@ namespace Maths {
 			ValueType maximum = ValueType(0);
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n) {
-					ValueType magnitude = abs(data[m][n]);
+					ValueType magnitude = abs((*this)[m, n]);
 					if((m==0 && n==0) || maximum < magnitude)
 						maximum = magnitude;
 				}
@@ -501,7 +505,7 @@ namespace Maths {
 			ValueType minimum = ValueType(0);
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n) {
-					ValueType magnitude = abs(data[m][n]);
+					ValueType magnitude = abs((*this)[m, n]);
 					if((m==0 && n==0) || minimum > magnitude)
 						minimum = magnitude;
 				}
@@ -513,7 +517,7 @@ namespace Maths {
 			ValueType sum = ValueType(0);
 			for(IndexType m = 0; m < M; ++m)
 				for(IndexType n = 0; n < N; ++n)
-					sum += data[m][n]*data[m][n];
+					sum += (*this)[m, n]*(*this)[m, n];
 			return sqrt(sum);
 		}
 		ValueType norm_euclidean() const { return norm_frobenius(); }

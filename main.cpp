@@ -9,7 +9,7 @@ template<IndexType M, IndexType N, typename Scalar, bool use_heap>
 void print_matrix(const Matrix<M, N, Scalar, use_heap>& mat, std::streamsize spacing_width = 12) {
 	for(IndexType m = 0; m < M; ++m) {
 		for(IndexType n = 0; n < N; ++n)
-			std::cout << std::setw(spacing_width) << mat.data[m][n] << ",";
+			std::cout << std::setw(spacing_width) << mat[m, n] << ",";
 		std::cout << std::endl;
 	}
 }

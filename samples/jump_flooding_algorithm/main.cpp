@@ -67,7 +67,7 @@ int main() {
 			})
 		);
 		//row index is y, column index is x - hence y, x
-		auto&& cell = mat_image[position(1)][position(0)];
+		auto&& cell = mat_image[position(1), position(0)];
 		//insert seed into the cell
 		std::get<0>(cell) = &seed;
 		std::get<1>(cell) = 0.0;
@@ -83,7 +83,7 @@ int main() {
 		//for each element of the image matrix
 		for(IndexType m = 0; m < image_height; ++m)
 			for(IndexType n = 0; n < image_width; ++n) {
-				auto&& current_cell = mat_image[m][n];
+				auto&& current_cell = mat_image[m, n];
 				//for each 3x3 kernel sample
 				for(std::int32_t y = -1; y <= 1; ++y) {
 					for(std::int32_t x = -1; x <= 1; ++x) {
@@ -93,7 +93,7 @@ int main() {
 						IndexType
 							pos_x = eucmod(static_cast<std::int32_t>(n)+x*offset_scale, static_cast<std::int32_t>(image_width)),
 							pos_y = eucmod(static_cast<std::int32_t>(m)+y*offset_scale, static_cast<std::int32_t>(image_height));
-						auto&& sample_cell = mat_image[pos_y][pos_x];
+						auto&& sample_cell = mat_image[pos_y, pos_x];
 						//if sample is not empty
 						auto sample_seed = std::get<0>(sample_cell);
 						if(sample_seed) {

@@ -55,7 +55,7 @@ template<IndexType M, IndexType N, typename Scalar, bool use_heap>
 void print_matrix(const Matrix<M, N, Scalar, use_heap>& mat, std::streamsize spacing_width = 12) {
 	for(IndexType m = 0; m < M; ++m) {
 		for(IndexType n = 0; n < N; ++n)
-			std::cout << std::setw(spacing_width) << mat.data[m][n] << ",";
+			std::cout << std::setw(spacing_width) << mat[m, n] << ",";
 		std::cout << std::endl;
 	}
 }
@@ -76,11 +76,11 @@ int main() {
 		for(int n = 0; n < 5; ++n) {
 			Matrix<5,5,GF2> btnpress;
 			btnpress.zero();
-			btnpress[m][n] = GF2(1);
-			if(m > 0) btnpress[m-1][n] = GF2(1);
-			if(m < 5-1) btnpress[m+1][n] = GF2(1);
-			if(n > 0) btnpress[m][n-1] = GF2(1);
-			if(n < 5-1) btnpress[m][n+1] = GF2(1);
+			btnpress[m, n] = GF2(1);
+			if(m > 0) btnpress[m-1, n] = GF2(1);
+			if(m < 5-1) btnpress[m+1, n] = GF2(1);
+			if(n > 0) btnpress[m, n-1] = GF2(1);
+			if(n < 5-1) btnpress[m, n+1] = GF2(1);
 			auto btnpress_flat = btnpress.get_v();
 			A_flat.insert(A_flat.end(), btnpress_flat.begin(), btnpress_flat.end());
 		}
