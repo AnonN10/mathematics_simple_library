@@ -161,6 +161,11 @@ namespace Maths {
 		
 		//getters and iterators
 
+		auto begin() { return data.begin(); }
+		auto end() { return data.end(); }
+		const auto begin() const { return data.begin(); }
+		const auto end() const { return data.end(); }
+
 		std::array<Field, M*N> get() {
 			std::array<Field, M*N> flat_list;
 			for(IndexType m = 0; m < M; ++m)
@@ -170,10 +175,7 @@ namespace Maths {
 		}
 
 		std::vector<Field> get_v() {
-			std::vector<Field> flat_list(M*N);
-			for(IndexType m = 0; m < M; ++m)
-				for(IndexType n = 0; n < N; ++n)
-					flat_list[N*m + n] = (*this)[m, n];
+			std::vector<Field> flat_list(data.begin(), data.end());
 			return flat_list;
 		}
 		
@@ -250,8 +252,8 @@ namespace Maths {
 				for(decltype(N_other) n = 0; n < N_other; ++n) {
 					//dot product
 					result[m, n] = std::transform_reduce(
-						this->data.begin()+N*m, this->data.begin()+N*(m+1),
-						other_T.data.begin()+M_other*n,
+						this->begin()+N*m, this->begin()+N*(m+1),
+						other_T.begin()+M_other*n,
 						Field(0), std::plus<>{}, std::multiplies<>{}
 					);
 				}

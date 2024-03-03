@@ -116,6 +116,10 @@ int main() {
 
 	std::cout << "abc.normalize_minmax():" << std::endl;
 	print_matrix(abc.normalize_minmax());
+
+	std::transform(abc.begin(), abc.end(), abc.begin(), [](auto in)->auto { return in*2.0; });
+	std::cout << "abc*2 via std::transform(...):" << std::endl;
+	print_matrix(abc);
 	
     return 0;
 }
