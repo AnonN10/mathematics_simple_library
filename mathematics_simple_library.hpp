@@ -406,10 +406,8 @@ namespace Maths {
 		}
 
 		auto operator[] (IndexType row, IndexType column) const {
-			IndexType row_offset = 0, column_offset = 0;
-			for(auto&& r : erased_rows) if(r <= row) ++row_offset;
-			for(auto&& c : erased_columns) if(c <= column) ++column_offset;
-			row += row_offset; column += column_offset;
+			for(IndexType i = erased_rows.size(); i-- > 0; ) if(erased_rows[i] <= row) ++row;
+			for(IndexType i = erased_columns.size(); i-- > 0; ) if(erased_columns[i] <= column) ++column;
 			return matrix[row, column];
 		}
 
@@ -457,17 +455,17 @@ namespace Maths {
 				return result;
 			}
 		} else {
-			auto result = zero;
 			if(m.row_count().get() == 1) return determinant<StaticExtent<1>, StaticExtent<1>>(m);
 			else if(m.row_count().get() == 2) return determinant<StaticExtent<2>, StaticExtent<2>>(m);
 			else {
+				auto result = zero;
 				for (IndexType n = 0; n < m.column_count().get(); n++)
 					result +=
 						m[0, n] * 
 						static_cast<value_type>(n&1?-1:1) * 
 						determinant<DynamicExtent, DynamicExtent>(submatrix(m, 0, n));
+				return result;
 			}
-			return result;
 		}
 
 		return zero;
@@ -489,6 +487,8 @@ namespace Maths {
 
 		constexpr auto operator[] (IndexType row, IndexType column) const {
 			using value_type = std::remove_reference_t<decltype(matrix[0,0])>;
+			//std::cout << "cofactor [" << row << "," << column << "], det=" << determinant(submatrix(matrix, row, column)) << std::endl;
+			//print(submatrix(matrix, row, column));
 			return static_cast<value_type>((row+column)&1?-1:1) * determinant(submatrix(matrix, row, column));
 		}
 		constexpr auto row_count() const { return matrix.row_count(); }
