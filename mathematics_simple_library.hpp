@@ -83,9 +83,7 @@ namespace Maths {
 	constexpr T lerp(T a, T b, U t) { return linear_interpolation(a, b, t); }
 
 	template <typename T>
-	constexpr T kronecker_delta(IndexType i, IndexType j) {
-		return static_cast<T>(i==j);
-	}
+	constexpr T kronecker_delta(IndexType i, IndexType j) { return static_cast<T>(i==j); }
 
 	template <class T>
 	concept Container = requires(T& container) {
@@ -168,6 +166,16 @@ namespace Maths {
 			return op(extent, StaticExtent<Value>{});
 		else
 			return op(extent, Value);
+	}
+
+	template <Extent E, Extent F, typename BinaryOperator>
+	constexpr auto evaluate_extent([[maybe_unused]] const E& extent, [[maybe_unused]] const F& other, [[maybe_unused]] BinaryOperator op) {
+		if constexpr((E::is_static() && F::is_static()) || !(E::is_static() || F::is_static()))
+			return op(extent, other);
+		else if constexpr(E::is_static() && !F::is_static())
+			return op(DynamicExtent{E::get()}, other);
+		else if constexpr(!E::is_static() && F::is_static())
+			return op(extent, DynamicExtent{F::get()});
 	}
 	
 	template <typename V>
@@ -341,458 +349,20 @@ namespace Maths {
 
 	template <Container T, bool ColumnMajor = false>
 	constexpr auto mat_ref(T& container, IndexType rows, IndexType columns) {
-		return mat_ref<T, ColumnMajor>(std::data(container), rows, columns);
-	}
-	
-	template <Matrix M>
-	struct Transpose {
-		M matrix;
-		constexpr auto operator[] (IndexType row, IndexType column) const { return matrix[column, row]; }
-		constexpr auto row_count() const { return matrix.column_count(); }
-		constexpr auto column_count() const { return matrix.row_count(); }
-	};
-
-	template <Matrix M>
-	constexpr auto transpose(const M& m) { return Transpose<M> { m }; }
-
-	template <MatrixStatic M, Extent ErasedRow, Extent ErasedColumn>
-	struct Submatrix {
-		M matrix;
-		ErasedRow erased_row;
-		ErasedColumn erased_column;
-
-		constexpr Submatrix(const M& matrix, const ErasedRow& erased_row = {}, const ErasedColumn& erased_column = {})
-			: matrix(matrix), erased_row(erased_row), erased_column(erased_column)
-		{
-			assert_extent(erased_row, matrix.row_count(), std::less<>{});
-			assert_extent(erased_column, matrix.column_count(), std::less<>{});
-		}
-
-		constexpr auto operator[] (IndexType row, IndexType column) const {
-			row = row >= erased_row.get() ? row+1 : row;
-			column = column >= erased_column.get() ? column+1 : column;
-			return matrix[row, column];
-		}
-
-		constexpr auto row_count() const {
-			return evaluate_extent<1>(matrix.row_count(), std::minus<>{});
-		}
-		constexpr auto column_count() const {
-			return evaluate_extent<1>(matrix.column_count(), std::minus<>{});
-		}
-	};
-
-	template <Matrix M>
-	struct SubmatrixDynamic {
-		M matrix;
-		std::vector<IndexType> erased_rows;
-		std::vector<IndexType> erased_columns;
-
-		SubmatrixDynamic(const M& matrix, IndexType erased_row, IndexType erased_column) : matrix(matrix)
-		{
-			assert(erased_row < matrix.row_count().get());
-			assert(erased_column < matrix.column_count().get());
-			erased_rows.push_back(erased_row);
-			erased_columns.push_back(erased_column);
-		}
-
-		SubmatrixDynamic(const SubmatrixDynamic<M>& submatrix, IndexType erased_row, IndexType erased_column)
-			: matrix(submatrix.matrix), erased_rows(submatrix.erased_rows), erased_columns(submatrix.erased_columns)
-		{
-			assert(erased_row < submatrix.row_count().get());
-			assert(erased_column < submatrix.column_count().get());
-			erased_rows.push_back(erased_row);
-			erased_columns.push_back(erased_column);
-		}
-
-		auto operator[] (IndexType row, IndexType column) const {
-			for(IndexType i = erased_rows.size(); i-- > 0; ) if(erased_rows[i] <= row) ++row;
-			for(IndexType i = erased_columns.size(); i-- > 0; ) if(erased_columns[i] <= column) ++column;
-			return matrix[row, column];
-		}
-
-		auto row_count() const {
-			return DynamicExtent(matrix.row_count().get()) - erased_rows.size();
-		}
-		auto column_count() const {
-			return DynamicExtent(matrix.column_count().get()) - erased_columns.size();
-		}
-	};
-
-	template <IndexType ErasedRow, IndexType ErasedColumn, MatrixStatic M>
-	constexpr auto submatrix(const M& m) {
-		return Submatrix<M, StaticExtent<ErasedRow>, StaticExtent<ErasedColumn>> { m };
+		return mat_ref<typename T::value_type, ColumnMajor>(std::data(container), rows, columns);
 	}
 
-	template <Matrix M>
-	constexpr auto submatrix(const M& m, IndexType erased_row, IndexType erased_column) {
-		return SubmatrixDynamic<M> { m, erased_row, erased_column };
-	}
+	template <IndexType Rows, IndexType Columns, Container T, bool ColumnMajor = false>
+	using mat_ref_static_container_t = decltype(mat_ref<Rows, Columns, T, ColumnMajor>(*static_cast<T*>(0)));
 
-	template <Matrix M>
-	constexpr auto submatrix(const SubmatrixDynamic<M>& m, IndexType erased_row, IndexType erased_column) {
-		return SubmatrixDynamic<M> { m, erased_row, erased_column };
-	}
-
-	template <Extent Rows, Extent Columns, Matrix M>
-	constexpr auto determinant(const M& m) {
-		assert_extent(m.row_count(), m.column_count(), std::equal_to<>{});
-		using value_type = std::remove_reference_t<decltype(m[0,0])>;
-		constexpr auto zero = static_cast<value_type>(0);
-		if constexpr (Rows::is_static() && Columns::is_static()) {
-			if constexpr (Rows::get() == 1){
-				return m[0, 0];
-			} else if constexpr (Rows::get() == 2) {
-				return m[0, 0]*m[1, 1] - m[0, 1]*m[1, 0];
-			} else {
-				auto result = zero;
-				static_loop<IndexType, Columns::get()>([&result, &m](auto n){
-					result +=
-						m[0, n] * 
-						static_cast<value_type>(n&1?-1:1) * 
-						determinant<StaticExtent<Rows::get()-1>, StaticExtent<Columns::get()-1>>(submatrix<0, n>(m));
-				});
-				return result;
-			}
-		} else {
-			if(m.row_count().get() == 1) return determinant<StaticExtent<1>, StaticExtent<1>>(m);
-			else if(m.row_count().get() == 2) return determinant<StaticExtent<2>, StaticExtent<2>>(m);
-			else {
-				auto result = zero;
-				for (IndexType n = 0; n < m.column_count().get(); n++)
-					result +=
-						m[0, n] * 
-						static_cast<value_type>(n&1?-1:1) * 
-						determinant<DynamicExtent, DynamicExtent>(submatrix(m, 0, n));
-				return result;
-			}
-		}
-
-		return zero;
-	}
-
-	template <MatrixStatic M>
-	constexpr auto determinant(const M& m) {
-		return determinant<decltype(std::declval<M>().row_count()), decltype(std::declval<M>().column_count())>(m);
-	}
-
-	template <Matrix M>
-	constexpr auto determinant(const M& m) {
-		return determinant<DynamicExtent, DynamicExtent>(m);
-	}
-
-	template <Matrix M>
-	struct Cofactor {
-		M matrix;
-
-		constexpr auto operator[] (IndexType row, IndexType column) const {
-			using value_type = std::remove_reference_t<decltype(matrix[0,0])>;
-			//std::cout << "cofactor [" << row << "," << column << "], det=" << determinant(submatrix(matrix, row, column)) << std::endl;
-			//print(submatrix(matrix, row, column));
-			return static_cast<value_type>((row+column)&1?-1:1) * determinant(submatrix(matrix, row, column));
-		}
-		constexpr auto row_count() const { return matrix.row_count(); }
-		constexpr auto column_count() const { return matrix.column_count(); }
-	};
-
-	template <Matrix M>
-	constexpr auto cofactor(const M& m) { return Cofactor<M> { m }; }
-	
-	template <Matrix M>
-	constexpr auto adjugate(const M& m) { return transpose(cofactor(m)); }
-	
-	template <Matrix M>
-	constexpr auto inverse(const M& m) { return adjugate(m)/determinant(m); }
-	template <Matrix M>
-	constexpr auto inv(const M& m) { return inverse(m); }
-	
-	template <Matrix M, Extent E>
-	struct RowOf {
-		M matrix;
-		E row;
-
-		RowOf(const M& matrix, const E& row = {}) : matrix(matrix), row(row) {
-			assert_extent(row, matrix.row_count(), std::less<>{});
-		}
-
-		auto operator[] (IndexType element) const { return matrix[row.get(), element]; }
-
-		auto size() const { return matrix.column_count(); }
-	};
-
-	template <Matrix M>
-	inline auto row_of(const M& m, IndexType row) { return RowOf<M, DynamicExtent> { m, row }; }
-	
-	template <IndexType Row, Matrix M>
-	inline auto row_of(const M& m) { return RowOf<M, StaticExtent<Row>> { m }; }
-
-	template <Matrix M>
-	inline auto column_of(const M& m, IndexType col) { return row_of(transpose(m), col); }
-
-	template <IndexType Column, Matrix M>
-	inline auto column_of(const M& m) { return RowOf<M, StaticExtent<Column>> { transpose(m) }; }
-
-	template <Matrix L, Matrix R>
-	struct MatrixMultiplication {
-		L left;
-		R right;
-
-		MatrixMultiplication(const L& l, const R& r) : left(l), right(r) {
-			assert_extent(left.column_count(), right.row_count(), std::equal_to<>{});
-		}
-
-		auto operator[] (IndexType row, IndexType column) const {
-			auto&& l = row_of(left, row);
-			auto&& r = column_of(right, column);
-			assert_extent(l.size(), r.size(), std::equal_to<>{});
-			using T = decltype(l[0]);
-			//dot product
-			T sum = static_cast<T>(0);
-			for (IndexType i = 0; i < l.size().get(); ++i)
-				sum += l[i] * r[i];
-			return sum;
-		}
-
-		auto row_count() const { return left.row_count(); }
-		auto column_count() const { return right.column_count(); }
-	};
-
-	template <Matrix L, Matrix R>
-	inline auto operator* (const L& l, const R& r) {
-		return MatrixMultiplication<L, R> { l, r };
-	}
-
-	template <Matrix L, Matrix R, typename BinaryOperator>
-	struct MatrixComponentWiseBinaryOperation {
-		L left;
-		R right;
-    	BinaryOperator op;
-
-		MatrixComponentWiseBinaryOperation(const L& l, const R& r, const BinaryOperator& op = {})
-			: left(l), right(r), op(op)
-		{
-			assert_extent(left.row_count(), right.row_count(), std::equal_to<>{});
-			assert_extent(left.column_count(), right.column_count(), std::equal_to<>{});
-		}
-
-		auto operator[] (IndexType row, IndexType column) const {
-			return op(left[row, column], right[row, column]);
-		}
-
-		auto row_count() const { return left.row_count(); }
-		auto column_count() const { return left.column_count(); }
-	};
-
-	template <Matrix L, Matrix R>
-	inline auto operator+ (const L& l, const R& r) {
-		return MatrixComponentWiseBinaryOperation<L, R, std::plus<>> { l, r };
-	}
-
-	template <Matrix L, Matrix R>
-	inline auto operator- (const L& l, const R& r) {
-		return MatrixComponentWiseBinaryOperation<L, R, std::minus<>> { l, r };
-	}
-
-	template <Matrix L, Matrix R>
-	inline auto hadamard_product(const L& l, const R& r) {
-		return MatrixComponentWiseBinaryOperation<L, R, std::multiplies<>> { l, r };
-	}
-
-	template <Matrix L, Matrix R>
-	inline auto hadamard_division(const L& l, const R& r) {
-		return MatrixComponentWiseBinaryOperation<L, R, std::divides<>> { l, r };
-	}
-
-	template <Matrix L, typename Field, typename BinaryOperator>
-	struct MatrixScalarBinaryOperation {
-		L left;
-		Field right;
-    	BinaryOperator op;
-
-		MatrixScalarBinaryOperation(const L& l, const Field& r, const BinaryOperator& op = {})
-			: left(l), right(r), op(op)
-		{}
-
-		auto operator[] (IndexType row, IndexType column) const {
-			return op(left[row, column], right);
-		}
-
-		auto row_count() const { return left.row_count(); }
-		auto column_count() const { return left.column_count(); }
-	};
-
-	template <Matrix L, typename Field>
-	inline auto operator* (const L& l, const Field& r) {
-		return MatrixScalarBinaryOperation<L, Field, std::multiplies<>> { l, r };
-	}
-	template <typename Field, Matrix R>
-	inline auto operator* (const Field& l, const R& r) { return r * l; }
-
-	template <Matrix L, typename Field>
-	inline auto operator/ (const L& l, const Field& r) {
-		return MatrixScalarBinaryOperation<L, Field, std::divides<>> { l, r };
-	}
-
-	template <Matrix L, typename Field>
-	inline auto operator+ (const L& l, const Field& r) {
-		return MatrixScalarBinaryOperation<L, Field, std::plus<>> { l, r };
-	}
-	template <typename Field, Matrix R>
-	inline auto operator+ (const Field& l, const R& r) { return r + l; }
-
-	template <Matrix L, typename Field>
-	inline auto operator- (const L& l, const Field& r) {
-		return MatrixScalarBinaryOperation<L, Field, std::minus<>> { l, r };
-	}
-
-	template <Vector V>
-	struct MatrixScaling {
-		V coefficients;
-
-		MatrixScaling(const V& coeffs) : coefficients(coeffs) {}
-
-		auto operator[] (IndexType row, IndexType column) const {
-			return row == column ?
-				coefficients[row] :
-				static_cast<decltype(coefficients[row])>(0);
-		}
-
-		auto row_count() const { return coefficients.size(); }
-		auto column_count() const { return coefficients.size(); }
-	};
-
-	template <Vector V>
-	inline auto scaling(const V& coefficients) { return MatrixScaling<V> { coefficients }; }
-
-	template <Vector V>
-	struct MatrixTranslation {
-		V coefficients;
-
-		MatrixTranslation(const V& coeffs) : coefficients(coeffs) {}
-
-		auto operator[] (IndexType row, IndexType column) const {
-			constexpr auto zero = static_cast<decltype(coefficients[row])>(0);
-			constexpr auto one = static_cast<decltype(coefficients[row])>(1);
-			return row == column ? one : (column == coefficients.size().get()? coefficients[row] : zero);
-		}
-
-		auto row_count() const { return coefficients.size()+1; }
-		auto column_count() const { return coefficients.size()+1; }
-	};
-
-	template <Vector V>
-	inline auto translation(const V& coefficients) { return MatrixTranslation<V> { coefficients }; }
-
-	template <typename Field, Vector U, Vector V>
-	struct MatrixRotation {
-		U basis_u;
-		V basis_v;
-		Field theta;
-
-		MatrixRotation(const V& basis_u, const V& basis_v, Field theta)
-			: basis_u(basis_u), basis_v(basis_v), theta(theta)
-		{
-			assert_extent(basis_u.size(), basis_v.size(), std::equal_to<>{});
-		}
-
-		auto operator[] (IndexType row, IndexType column) const {
-			//A=I+sin(θ)(vu^T−uv^T)+(cos(θ)−1)(uu^T+vv^T)
-			return
-				kronecker_delta<Field>(row, column) + 
-				std::sin(theta) * 
-				(as_column(basis_v)*as_row(basis_u) - as_column(basis_u)*as_row(basis_v))[row, column] + 
-				(std::cos(theta) - static_cast<Field>(1)) * 
-				(as_column(basis_u)*as_row(basis_u) + as_column(basis_v)*as_row(basis_v))[row, column];
-		}
-
-		auto row_count() const { return basis_u.size(); }
-		auto column_count() const { return basis_u.size(); }
-	};
-
-	template <typename Field, Vector U, Vector V>
-	inline auto rotation(const U& basis_u, const V& basis_v, Field theta) {
-		return MatrixRotation<Field, U, V> { basis_u, basis_v, theta };
-	}
-
-	template <typename T, bool ColumnMajor = false>
-	inline auto vec_ref(T* base_ptr, IndexType size) {
-		return row_of(mat_ref<T, ColumnMajor>(base_ptr, 1, size), 0);
-	}
-
-	template <IndexType Size, typename T, bool ColumnMajor = false>
-	inline auto vec_ref(T* base_ptr) {
-		return row_of<0>(mat_ref<1, Size, T, ColumnMajor>(base_ptr));
-	}
-	
-	template <typename T, bool ColumnMajor = false>
-	inline auto vec_ref(std::initializer_list<T> elements) {
-		return vec_ref<const T, ColumnMajor>(std::data(elements), std::size(elements));
-	}
-
-	template <typename T, IndexType N, bool ColumnMajor = false>
-	inline auto vec_ref(const std::span<T, N>& span) {
-		if constexpr (N == std::dynamic_extent) {
-			return vec_ref<T, ColumnMajor>(span.data(), span.size());
-		} else {
-			return vec_ref<N, T, ColumnMajor>(span.data());
-		}
-	}
-
-	template <typename T, IndexType N>
-	inline auto vec_ref(const std::array<T, N>& array) {
-		return vec_ref(std::span { array });
-	}
-
-	template <typename T>
-	inline auto vec_ref(const std::vector<T>& vector) {
-		return vec_ref(std::span { vector });
-	}
+	template <IndexType Rows, IndexType Columns, typename T, bool ColumnMajor = false>
+	using mat_ref_static_t = decltype(mat_ref<Rows, Columns, T, ColumnMajor>(std::initializer_list<T>{}));
 
 	template <Container T, bool ColumnMajor = false>
-	inline auto vec_ref(T& container) {
-		return vec_ref<T, ColumnMajor>(std::data(container), std::size(container));
-	}
+	using mat_ref_dynamic_container_t = decltype(mat_ref<T, ColumnMajor>(*static_cast<T*>(0), 0, 0));
 
-	template <Vector V>
-	struct AsRowVector {
-		V vector;
-
-		auto operator[] (IndexType row, IndexType column) const {
-			assert(row == 0);
-			return vector[column];
-		}
-
-		auto row_count() const { return StaticExtent<1>(); }
-		auto column_count() const { return vector.size(); }
-	};
-
-	template <Vector V>
-	inline auto as_row(const V& vector) {
-		return AsRowVector<V>{ vector };
-	}
-
-	template <Vector V>
-	struct AsColumnVector {
-		V vector;
-
-		auto operator[] (IndexType row, IndexType column) const {
-			assert(column == 0);
-			return vector[row];
-		}
-
-		auto row_count() const { return vector.size(); }
-		auto column_count() const { return StaticExtent<1>(); }
-	};
-
-	template <Vector V>
-	inline auto as_column(const V& vector) {
-		return AsColumnVector<V>{ vector };
-	}
-
-	template <Vector A, Vector B>
-	inline auto dot(A a, B b) {
-		return (as_row(a) * as_column(b))[0, 0];
-	}
+	template <typename T, bool ColumnMajor = false>
+	using mat_ref_dynamic_t = decltype(mat_ref<T, ColumnMajor>(std::initializer_list<T>{}, 0, 0));
 
 	//TODO: improve, specifically the array check part, check instead for dynamic and static container concepts (maybe)
 	template <Container T, Extent ExtR, Extent ExtC, bool ColumnMajor>
@@ -924,6 +494,628 @@ namespace Maths {
 
 	template <typename T, bool ColumnMajor = false>
 	using mat_dynamic_t = decltype(mat<T, ColumnMajor>(std::initializer_list<T>{}, 0, 0));
+
+	template <Matrix L, Matrix R>
+	struct AugmentedMatrix {
+		L left;
+		R right;
+
+		constexpr AugmentedMatrix(const L& l, const R& r) : left(l), right(r) {
+			assert_extent(left.row_count(), right.row_count(), std::equal_to<>{});
+		}
+
+		constexpr auto operator[] (IndexType row, IndexType column) const {
+			if(column >= left.column_count().get())
+				return right[row, column - left.column_count().get()];
+			return left[row, column];
+		}
+
+		constexpr auto row_count() const { return left.row_count(); }
+		constexpr auto column_count() const { return evaluate_extent(left.column_count(), right.column_count(), std::plus<>{}); }
+	};
+
+	template <Matrix L, Matrix R> constexpr auto augment(const L& left, const R& right) { return AugmentedMatrix{left, right}; }
+	template <Matrix L, Matrix R> constexpr auto join(const L& left, const R& right) { return augment(left, right); }
+
+	template <Matrix M, Extent E, bool Vertical = false, bool SecondHalf = false>
+	struct SplitMatrix {
+		M matrix;
+		E split_bound;
+
+		constexpr SplitMatrix(const M& m, const E& split_bound = {}) : matrix(m), split_bound(split_bound) {
+			if constexpr (Vertical) {
+				assert_extent(split_bound, matrix.row_count(), std::less<>{});
+			} else {
+				assert_extent(split_bound, matrix.column_count(), std::less<>{});
+			}
+		}
+
+		constexpr auto operator[] (IndexType row, IndexType column) const {
+			if constexpr (SecondHalf)
+				if constexpr (Vertical) return matrix[row + split_bound.get(), column];
+				else return matrix[row, column + split_bound.get()];
+			else return matrix[row, column];
+		}
+
+		constexpr auto row_count() const {
+			if constexpr (Vertical)
+				if constexpr (SecondHalf)
+					return evaluate_extent(matrix.row_count(), split_bound, std::minus<>{});
+				else
+					return split_bound;
+			else return matrix.row_count();
+		}
+		constexpr auto column_count() const {
+			if constexpr (!Vertical)
+				if constexpr (SecondHalf)
+					return evaluate_extent(matrix.column_count(), split_bound, std::minus<>{});
+				else
+					return split_bound;
+			else return matrix.column_count();
+		}
+	};
+
+	template <Matrix M> constexpr auto split_left(const M& m, IndexType split_bound) {
+		return SplitMatrix<M, DynamicExtent, false, false>{m, split_bound};
+	}
+	template <IndexType SplitBound, Matrix M> constexpr auto split_left(const M& m) {
+		return SplitMatrix<M, StaticExtent<SplitBound>, false, false>{m};
+	}
+
+	template <Matrix M> constexpr auto split_right(const M& m, IndexType split_bound) {
+		return SplitMatrix<M, DynamicExtent, false, true>{m, split_bound};
+	}
+	template <IndexType SplitBound, Matrix M> constexpr auto split_right(const M& m) {
+		return SplitMatrix<M, StaticExtent<SplitBound>, false, true>{m};
+	}
+
+	template <Matrix M> constexpr auto split_top(const M& m, IndexType split_bound) {
+		return SplitMatrix<M, DynamicExtent, true, false>{m, split_bound};
+	}
+	template <IndexType SplitBound, Matrix M> constexpr auto split_top(const M& m) {
+		return SplitMatrix<M, StaticExtent<SplitBound>, true, false>{m};
+	}
+
+	template <Matrix M> constexpr auto split_bottom(const M& m, IndexType split_bound) {
+		return SplitMatrix<M, DynamicExtent, true, true>{m, split_bound};
+	}
+	template <IndexType SplitBound, Matrix M> constexpr auto split_bottom(const M& m) {
+		return SplitMatrix<M, StaticExtent<SplitBound>, true, true>{m};
+	}
+	
+	template <Matrix M>
+	struct ReducedRowEchelonMatrix {
+		using value_type = std::remove_reference_t<decltype(std::declval<M>()[0,0])>;
+		mat_dynamic_t<value_type> matrix;
+
+		ReducedRowEchelonMatrix(const M& m) : matrix(m.row_count().get(), m.column_count().get()) {
+			//matrix = mat<value_type>(m.row_count().get(), m.column_count().get());
+			matrix = m;
+
+			using std::abs;
+		
+			for(IndexType lead = 0; lead < matrix.row_count().get(); ++lead) {
+				value_type divisor, multiplier;
+				IndexType pivot = lead;
+				for (IndexType row = lead; row < matrix.row_count().get(); ++row)
+					if (abs(matrix[pivot, lead]) < abs(matrix[row, lead]))
+						pivot = row;
+				if(pivot != lead)
+					for (IndexType column = 0; column < matrix.column_count().get(); ++column)
+						std::swap(matrix[pivot, column], matrix[lead, column]);
+
+				for (IndexType row = 0; row < matrix.row_count().get(); ++row) {
+					divisor = matrix[lead, lead];
+					if(divisor == static_cast<value_type>(0)) continue;
+
+					multiplier = matrix[row, lead] / divisor;
+					for (IndexType column = 0; column < matrix.column_count().get(); ++column)
+						if (row == lead)
+							matrix[row, column] /= divisor;
+						else
+							matrix[row, column] -= matrix[lead, column] * multiplier;
+				}
+			}
+		}
+
+		auto operator[] (IndexType row, IndexType column) const {
+			return matrix[row, column];
+		}
+		auto row_count() const { return matrix.row_count(); }
+		auto column_count() const { return matrix.column_count(); }
+	};
+
+	template <Matrix M> inline auto reduced_row_echelon_form(const M& m) { return ReducedRowEchelonMatrix{m}; }
+	template <Matrix M> inline auto rref(const M& m) { return reduced_row_echelon_form(m); }
+
+	template <Matrix M>
+	struct Conjugate {
+		M matrix;
+
+		constexpr auto operator[] (IndexType row, IndexType column) const {
+			using value_type = std::remove_reference_t<decltype(matrix[0,0])>;
+			if constexpr(is_complex_v<value_type>)
+				return std::conj(matrix[row, column]);
+			else
+				return matrix[row, column];
+		}
+		constexpr auto row_count() const { return matrix.row_count(); }
+		constexpr auto column_count() const { return matrix.column_count(); }
+	};
+
+	template <Matrix M> constexpr auto conjugate(const M& m) { return Conjugate(m); }
+	template <Matrix M> constexpr auto conj(const M& m) { return conjugate(m); }
+	
+	template <Matrix M>
+	struct Transpose {
+		M matrix;
+		constexpr auto operator[] (IndexType row, IndexType column) const { return matrix[column, row]; }
+		constexpr auto row_count() const { return matrix.column_count(); }
+		constexpr auto column_count() const { return matrix.row_count(); }
+	};
+
+	template <Matrix M> constexpr auto transpose(const M& m) { return Transpose<M> { m }; }
+
+	template <Matrix M> constexpr auto transpose_hermitian(const M& m) { return transpose(conjugate(m)); }
+
+	template <Matrix M> constexpr auto gramian(const M& m) { return transpose_hermitian(m)*m; }
+	template <Matrix M> constexpr auto gram(const M& m) { return gramian(m); }
+
+	template <MatrixStatic M, Extent ErasedRow, Extent ErasedColumn>
+	struct Submatrix {
+		M matrix;
+		ErasedRow erased_row;
+		ErasedColumn erased_column;
+
+		constexpr Submatrix(const M& matrix, const ErasedRow& erased_row = {}, const ErasedColumn& erased_column = {})
+			: matrix(matrix), erased_row(erased_row), erased_column(erased_column)
+		{
+			assert_extent(erased_row, matrix.row_count(), std::less<>{});
+			assert_extent(erased_column, matrix.column_count(), std::less<>{});
+		}
+
+		constexpr auto operator[] (IndexType row, IndexType column) const {
+			row = row >= erased_row.get() ? row+1 : row;
+			column = column >= erased_column.get() ? column+1 : column;
+			return matrix[row, column];
+		}
+
+		constexpr auto row_count() const {
+			return evaluate_extent<1>(matrix.row_count(), std::minus<>{});
+		}
+		constexpr auto column_count() const {
+			return evaluate_extent<1>(matrix.column_count(), std::minus<>{});
+		}
+	};
+
+	template <Matrix M>
+	struct SubmatrixDynamic {
+		M matrix;
+		std::vector<IndexType> erased_rows;
+		std::vector<IndexType> erased_columns;
+
+		SubmatrixDynamic(const M& matrix, IndexType erased_row, IndexType erased_column) : matrix(matrix)
+		{
+			assert(erased_row < matrix.row_count().get());
+			assert(erased_column < matrix.column_count().get());
+			erased_rows.push_back(erased_row);
+			erased_columns.push_back(erased_column);
+		}
+
+		SubmatrixDynamic(const SubmatrixDynamic<M>& submatrix, IndexType erased_row, IndexType erased_column)
+			: matrix(submatrix.matrix), erased_rows(submatrix.erased_rows), erased_columns(submatrix.erased_columns)
+		{
+			assert(erased_row < submatrix.row_count().get());
+			assert(erased_column < submatrix.column_count().get());
+			erased_rows.push_back(erased_row);
+			erased_columns.push_back(erased_column);
+		}
+
+		auto operator[] (IndexType row, IndexType column) const {
+			for(IndexType i = erased_rows.size(); i-- > 0; ) if(erased_rows[i] <= row) ++row;
+			for(IndexType i = erased_columns.size(); i-- > 0; ) if(erased_columns[i] <= column) ++column;
+			return matrix[row, column];
+		}
+
+		auto row_count() const {
+			return DynamicExtent(matrix.row_count().get()) - erased_rows.size();
+		}
+		auto column_count() const {
+			return DynamicExtent(matrix.column_count().get()) - erased_columns.size();
+		}
+	};
+
+	template <IndexType ErasedRow, IndexType ErasedColumn, MatrixStatic M>
+	constexpr auto submatrix(const M& m) {
+		return Submatrix<M, StaticExtent<ErasedRow>, StaticExtent<ErasedColumn>> { m };
+	}
+
+	template <Matrix M>
+	constexpr auto submatrix(const M& m, IndexType erased_row, IndexType erased_column) {
+		return SubmatrixDynamic<M> { m, erased_row, erased_column };
+	}
+
+	template <Matrix M>
+	constexpr auto submatrix(const SubmatrixDynamic<M>& m, IndexType erased_row, IndexType erased_column) {
+		return SubmatrixDynamic<M> { m, erased_row, erased_column };
+	}
+
+	template <Extent Rows, Extent Columns, Matrix M>
+	constexpr auto determinant(const M& m) {
+		assert_extent(m.row_count(), m.column_count(), std::equal_to<>{});
+		using value_type = std::remove_reference_t<decltype(m[0,0])>;
+		constexpr auto zero = static_cast<value_type>(0);
+		if constexpr (Rows::is_static() && Columns::is_static()) {
+			if constexpr (Rows::get() == 1){
+				return m[0, 0];
+			} else if constexpr (Rows::get() == 2) {
+				return m[0, 0]*m[1, 1] - m[0, 1]*m[1, 0];
+			} else {
+				auto result = zero;
+				static_loop<IndexType, Columns::get()>([&result, &m](auto n){
+					result +=
+						m[0, n] * 
+						static_cast<value_type>(n&1?-1:1) * 
+						determinant<StaticExtent<Rows::get()-1>, StaticExtent<Columns::get()-1>>(submatrix<0, n>(m));
+				});
+				return result;
+			}
+		} else {
+			if(m.row_count().get() == 1) return determinant<StaticExtent<1>, StaticExtent<1>>(m);
+			else if(m.row_count().get() == 2) return determinant<StaticExtent<2>, StaticExtent<2>>(m);
+			else {
+				auto result = zero;
+				for (IndexType n = 0; n < m.column_count().get(); n++)
+					result +=
+						m[0, n] * 
+						static_cast<value_type>(n&1?-1:1) * 
+						determinant<DynamicExtent, DynamicExtent>(submatrix(m, 0, n));
+				return result;
+			}
+		}
+
+		return zero;
+	}
+
+	template <MatrixStatic M>
+	constexpr auto determinant(const M& m) {
+		return determinant<decltype(std::declval<M>().row_count()), decltype(std::declval<M>().column_count())>(m);
+	}
+
+	template <Matrix M>
+	constexpr auto determinant(const M& m) {
+		return determinant<DynamicExtent, DynamicExtent>(m);
+	}
+	template <Matrix M>
+	constexpr auto det(const M& m) { return determinant(m); }
+
+	template <Matrix M>
+	struct Cofactor {
+		M matrix;
+
+		constexpr auto operator[] (IndexType row, IndexType column) const {
+			using value_type = std::remove_reference_t<decltype(matrix[0,0])>;
+			return static_cast<value_type>((row+column)&1?-1:1) * determinant(submatrix(matrix, row, column));
+		}
+		constexpr auto row_count() const { return matrix.row_count(); }
+		constexpr auto column_count() const { return matrix.column_count(); }
+	};
+
+	template <Matrix M>
+	constexpr auto cofactor(const M& m) { return Cofactor<M> { m }; }
+	
+	template <Matrix M>
+	constexpr auto adjugate(const M& m) { return transpose(cofactor(m)); }
+	
+	template <Matrix M>
+	constexpr auto inverse(const M& m) { return adjugate(m)/determinant(m); }
+	template <Matrix M>
+	constexpr auto inv(const M& m) { return inverse(m); }
+
+	template <Matrix M>
+	constexpr auto inverse_gauss_jordan(const M& m) {
+		return split_right(rref(augment(m, mat_identity(m.row_count().get(), m.column_count().get()))), m.column_count().get());
+		//return augment(m, mat_identity(m.row_count().get(), m.column_count().get()));
+	}
+
+	/*template <MatrixStatic M>
+	constexpr auto inverse_gauss_jordan(const M& m) {
+		return split_right<column_count_static<M>()>(rref(augment(m, mat_identity<row_count_static<M>(), column_count_static<M>()>())));
+		//return rref(augment(m, mat_identity<row_count_static<M>(), column_count_static<M>()>()));
+	}*/
+	
+	template <Matrix M, Extent E>
+	struct RowOf {
+		M matrix;
+		E row;
+
+		constexpr RowOf(const M& matrix, const E& row = {}) : matrix(matrix), row(row) {
+			assert_extent(row, matrix.row_count(), std::less<>{});
+		}
+
+		constexpr auto operator[] (IndexType element) const { return matrix[row.get(), element]; }
+
+		constexpr auto size() const { return matrix.column_count(); }
+	};
+
+	template <Matrix M>
+	constexpr auto row_of(const M& m, IndexType row) { return RowOf<M, DynamicExtent> { m, row }; }
+	
+	template <IndexType Row, Matrix M>
+	constexpr auto row_of(const M& m) { return RowOf<M, StaticExtent<Row>> { m }; }
+
+	template <Matrix M>
+	constexpr auto column_of(const M& m, IndexType col) { return row_of(transpose(m), col); }
+
+	template <IndexType Column, Matrix M>
+	constexpr auto column_of(const M& m) { return RowOf<M, StaticExtent<Column>> { transpose(m) }; }
+
+	template <Matrix L, Matrix R>
+	struct MatrixMultiplication {
+		L left;
+		R right;
+
+		constexpr MatrixMultiplication(const L& l, const R& r) : left(l), right(r) {
+			assert_extent(left.column_count(), right.row_count(), std::equal_to<>{});
+		}
+
+		constexpr auto operator[] (IndexType row, IndexType column) const {
+			auto&& l = row_of(left, row);
+			auto&& r = column_of(right, column);
+			assert_extent(l.size(), r.size(), std::equal_to<>{});
+			using T = decltype(l[0]);
+			//dot product
+			T sum = static_cast<T>(0);
+			for (IndexType i = 0; i < l.size().get(); ++i)
+				sum += l[i] * r[i];
+			return sum;
+		}
+
+		constexpr auto row_count() const { return left.row_count(); }
+		constexpr auto column_count() const { return right.column_count(); }
+	};
+
+	template <Matrix L, Matrix R>
+	constexpr auto operator* (const L& l, const R& r) {
+		return MatrixMultiplication<L, R> { l, r };
+	}
+
+	template <Matrix L, Matrix R>
+	constexpr auto operator/ (const L& l, const R& r) {
+		return l * inverse(r);
+	}
+
+	template <Matrix L, Matrix R, typename BinaryOperator>
+	struct MatrixComponentWiseBinaryOperation {
+		L left;
+		R right;
+    	BinaryOperator op;
+
+		constexpr MatrixComponentWiseBinaryOperation(const L& l, const R& r, const BinaryOperator& op = {})
+			: left(l), right(r), op(op)
+		{
+			assert_extent(left.row_count(), right.row_count(), std::equal_to<>{});
+			assert_extent(left.column_count(), right.column_count(), std::equal_to<>{});
+		}
+
+		constexpr auto operator[] (IndexType row, IndexType column) const {
+			return op(left[row, column], right[row, column]);
+		}
+
+		constexpr auto row_count() const { return left.row_count(); }
+		constexpr auto column_count() const { return left.column_count(); }
+	};
+
+	template <Matrix L, Matrix R>
+	constexpr auto operator+ (const L& l, const R& r) {
+		return MatrixComponentWiseBinaryOperation<L, R, std::plus<>> { l, r };
+	}
+
+	template <Matrix L, Matrix R>
+	constexpr auto operator- (const L& l, const R& r) {
+		return MatrixComponentWiseBinaryOperation<L, R, std::minus<>> { l, r };
+	}
+
+	template <Matrix L, Matrix R>
+	constexpr auto hadamard_product(const L& l, const R& r) {
+		return MatrixComponentWiseBinaryOperation<L, R, std::multiplies<>> { l, r };
+	}
+
+	template <Matrix L, Matrix R>
+	constexpr auto hadamard_division(const L& l, const R& r) {
+		return MatrixComponentWiseBinaryOperation<L, R, std::divides<>> { l, r };
+	}
+
+	template <Matrix L, typename Field, typename BinaryOperator>
+	struct MatrixScalarBinaryOperation {
+		L left;
+		Field right;
+    	BinaryOperator op;
+
+		constexpr MatrixScalarBinaryOperation(const L& l, const Field& r, const BinaryOperator& op = {})
+			: left(l), right(r), op(op)
+		{}
+
+		constexpr auto operator[] (IndexType row, IndexType column) const {
+			return op(left[row, column], right);
+		}
+
+		constexpr auto row_count() const { return left.row_count(); }
+		constexpr auto column_count() const { return left.column_count(); }
+	};
+
+	template <Matrix L, typename Field>
+	constexpr auto operator* (const L& l, const Field& r) {
+		return MatrixScalarBinaryOperation<L, Field, std::multiplies<>> { l, r };
+	}
+	template <typename Field, Matrix R>
+	constexpr auto operator* (const Field& l, const R& r) { return r * l; }
+
+	template <Matrix L, typename Field>
+	constexpr auto operator/ (const L& l, const Field& r) {
+		return MatrixScalarBinaryOperation<L, Field, std::divides<>> { l, r };
+	}
+
+	template <Matrix L, typename Field>
+	constexpr auto operator+ (const L& l, const Field& r) {
+		return MatrixScalarBinaryOperation<L, Field, std::plus<>> { l, r };
+	}
+	template <typename Field, Matrix R>
+	constexpr auto operator+ (const Field& l, const R& r) { return r + l; }
+
+	template <Matrix L, typename Field>
+	constexpr auto operator- (const L& l, const Field& r) {
+		return MatrixScalarBinaryOperation<L, Field, std::minus<>> { l, r };
+	}
+
+	template <Vector V>
+	struct MatrixScaling {
+		V coefficients;
+
+		constexpr MatrixScaling(const V& coeffs) : coefficients(coeffs) {}
+
+		constexpr auto operator[] (IndexType row, IndexType column) const {
+			return row == column ?
+				coefficients[row] :
+				static_cast<decltype(coefficients[row])>(0);
+		}
+
+		constexpr auto row_count() const { return coefficients.size(); }
+		constexpr auto column_count() const { return coefficients.size(); }
+	};
+
+	template <Vector V>
+	constexpr auto scaling(const V& coefficients) { return MatrixScaling<V> { coefficients }; }
+
+	template <Vector V>
+	struct MatrixTranslation {
+		V coefficients;
+
+		constexpr MatrixTranslation(const V& coeffs) : coefficients(coeffs) {}
+
+		constexpr auto operator[] (IndexType row, IndexType column) const {
+			constexpr auto zero = static_cast<decltype(coefficients[row])>(0);
+			constexpr auto one = static_cast<decltype(coefficients[row])>(1);
+			return row == column ? one : (column == coefficients.size().get()? coefficients[row] : zero);
+		}
+
+		constexpr auto row_count() const { return coefficients.size()+1; }
+		constexpr auto column_count() const { return coefficients.size()+1; }
+	};
+
+	template <Vector V>
+	constexpr auto translation(const V& coefficients) { return MatrixTranslation<V> { coefficients }; }
+
+	template <typename Field, Vector U, Vector V>
+	struct MatrixRotation {
+		U basis_u;
+		V basis_v;
+		Field theta;
+
+		MatrixRotation(const V& basis_u, const V& basis_v, Field theta)
+			: basis_u(basis_u), basis_v(basis_v), theta(theta)
+		{
+			assert_extent(basis_u.size(), basis_v.size(), std::equal_to<>{});
+		}
+
+		auto operator[] (IndexType row, IndexType column) const {
+			//A=I+sin(θ)(vu^T−uv^T)+(cos(θ)−1)(uu^T+vv^T)
+			return
+				kronecker_delta<Field>(row, column) + 
+				std::sin(theta) * 
+				(as_column(basis_v)*as_row(basis_u) - as_column(basis_u)*as_row(basis_v))[row, column] + 
+				(std::cos(theta) - static_cast<Field>(1)) * 
+				(as_column(basis_u)*as_row(basis_u) + as_column(basis_v)*as_row(basis_v))[row, column];
+		}
+
+		auto row_count() const { return basis_u.size(); }
+		auto column_count() const { return basis_u.size(); }
+	};
+
+	template <typename Field, Vector U, Vector V>
+	inline auto rotation(const U& basis_u, const V& basis_v, Field theta) {
+		return MatrixRotation<Field, U, V> { basis_u, basis_v, theta };
+	}
+
+	template <typename T, bool ColumnMajor = false>
+	constexpr auto vec_ref(T* base_ptr, IndexType size) {
+		return row_of(mat_ref<T, ColumnMajor>(base_ptr, 1, size), 0);
+	}
+
+	template <IndexType Size, typename T, bool ColumnMajor = false>
+	constexpr auto vec_ref(T* base_ptr) {
+		return row_of<0>(mat_ref<1, Size, T, ColumnMajor>(base_ptr));
+	}
+	
+	template <typename T, bool ColumnMajor = false>
+	constexpr auto vec_ref(std::initializer_list<T> elements) {
+		return vec_ref<const T, ColumnMajor>(std::data(elements), std::size(elements));
+	}
+
+	template <typename T, IndexType N, bool ColumnMajor = false>
+	constexpr auto vec_ref(const std::span<T, N>& span) {
+		if constexpr (N == std::dynamic_extent) {
+			return vec_ref<T, ColumnMajor>(span.data(), span.size());
+		} else {
+			return vec_ref<N, T, ColumnMajor>(span.data());
+		}
+	}
+
+	template <typename T, IndexType N>
+	constexpr auto vec_ref(const std::array<T, N>& array) {
+		return vec_ref(std::span { array });
+	}
+
+	template <typename T>
+	constexpr auto vec_ref(const std::vector<T>& vector) {
+		return vec_ref(std::span { vector });
+	}
+
+	template <Container T, bool ColumnMajor = false>
+	constexpr auto vec_ref(T& container) {
+		return vec_ref<T, ColumnMajor>(std::data(container), std::size(container));
+	}
+
+	template <Vector V>
+	struct AsRowVector {
+		V vector;
+
+		constexpr auto operator[] (IndexType row, IndexType column) const {
+			assert(row == 0);
+			return vector[column];
+		}
+
+		constexpr auto row_count() const { return StaticExtent<1>(); }
+		constexpr auto column_count() const { return vector.size(); }
+	};
+
+	template <Vector V>
+	constexpr auto as_row(const V& vector) {
+		return AsRowVector<V>{ vector };
+	}
+
+	template <Vector V>
+	struct AsColumnVector {
+		V vector;
+
+		constexpr auto operator[] (IndexType row, IndexType column) const {
+			assert(column == 0);
+			return vector[row];
+		}
+
+		constexpr auto row_count() const { return vector.size(); }
+		constexpr auto column_count() const { return StaticExtent<1>(); }
+	};
+
+	template <Vector V>
+	constexpr auto as_column(const V& vector) {
+		return AsColumnVector<V>{ vector };
+	}
+
+	template <Vector A, Vector B>
+	constexpr auto dot(A a, B b) {
+		return (as_row(a) * as_column(b))[0, 0];
+	}
 
 	template <Matrix M>
 	inline void print(const M& mat, std::ostream& os = std::cout, std::streamsize spacing_width = 12) {

@@ -22,7 +22,7 @@ int main() {
 
 	std::cout << "matrix object (embedded storage: std::array or std::vector)" << std::endl;
 	auto mobj_static = mat<2, 2>({1, 2, 3, 4});
-	auto mobj_dynamic = mat({1, 2, 3, 4}, 2, 2);
+	auto mobj_dynamic = mat<float>({1, 2, 3, 4}, 2, 2);
 	print(mobj_static);
 	print(mobj_dynamic);
 	mobj_dynamic.resize(1, 2);
@@ -66,14 +66,22 @@ int main() {
 	std::cout << "determinant mobj_dynamic:" << std::endl;
 	std::cout << determinant(mobj_dynamic) << std::endl;
 
-	//auto mat_id = mat_identity<4, 4>();
-	//std::cout << decltype(decltype(mat_id)::row_count())::get() << std::endl;
-	//std::cout << "submatrix(0, 0):" << std::endl;
-	//print(submatrix(transform, 0, 0));
 	std::cout << "inverse transform:" << std::endl;
 	print(inv(transform));
 	std::cout << "product:" << std::endl;
-	print(inv(transform)*transform);
+	print(mat_identity(4,4)/transform);
+
+	//print(rref(augment(transform, mat_identity(4,4))));
+	//print(rref(augment(mobj_dynamic, mat_identity(4,4))));
+	//print(split_right(rref(augment(mobj_dynamic, mat_identity(4,4))), 4));
+	print(inverse_gauss_jordan(mobj_dynamic));
+
+	print(inverse_gauss_jordan(transform));
+
+	/*mat_dynamic_t<float> mattest({1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}, 4, 4);
+	print(mattest);
+	print(submatrix(mattest, 2, 0));
+	print(submatrix(submatrix(mattest, 2, 0), 0, 0));*/
 	
 	/*Matrix<2,3> m({
 		1, 2, 3,
