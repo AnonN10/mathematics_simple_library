@@ -17,6 +17,7 @@
 #include <span>
 #include <initializer_list>
 #include <concepts>
+#include <utility>
 
 namespace Maths {
 
@@ -365,135 +366,119 @@ namespace Maths {
 	using mat_ref_dynamic_t = decltype(mat_ref<T, ColumnMajor>(std::initializer_list<T>{}, 0, 0));
 
 	//TODO: improve, specifically the array check part, check instead for dynamic and static container concepts (maybe)
-	template <Container T, Extent ExtR, Extent ExtC, bool ColumnMajor>
-	struct MatrixObject {
-		T data;
-		MatrixRef<typename T::value_type, ExtR, ExtC, ColumnMajor> ref;
+    template <typename T, IndexType Rows, IndexType Columns, bool ColumnMajor>
+    struct StaticMatrixObject {
+        std::array<T, Rows * Columns> data;
 
-		template<Matrix M>
-		requires (!(ExtR::is_static() && ExtC::is_static()))
-		MatrixObject(const M& m) : ref{std::data(data), ExtR{0}, ExtC{0}} {
-			(*this) = m;
-		}
+        StaticMatrixObject() = default;
+        StaticMatrixObject(const StaticMatrixObject&) = default;
+        StaticMatrixObject(std::initializer_list<T> elements) {
+            std::copy(elements.begin(), elements.end(), data.begin());
+        }
 
-		template<Matrix M>
-		requires (ExtR::is_static() && ExtC::is_static())
-		MatrixObject(const M& m) : ref{std::data(data), ExtR{ExtR::get()}, ExtC{ExtC::get()}} {
-			(*this) = m;
-		}
+        template <Matrix M>
+        StaticMatrixObject(const M& m) { *this = m; }
 
-		MatrixObject(
-			const ExtR& rows = {},
-			const ExtC& columns = {}
-		) : ref{std::data(data), rows, columns} {
-			if constexpr(!is_array_v<T>) {
-				data.resize(rows.get()*columns.get());
-				ref = {std::data(data), rows, columns};
-			}
-			for(IndexType i = 0; i < rows.get(); ++i)
-				for(IndexType j = 0; j < columns.get(); ++j)
-					(*this)[i,j] = kronecker_delta<typename T::value_type>(i, j);
-		}
+        template <typename U>
+        using RefType = MatrixRef<U, StaticExtent<Rows>, StaticExtent<Columns>, ColumnMajor>;
 
-		MatrixObject(
-			std::initializer_list<typename T::value_type> elements,
-			const ExtR& rows = {},
-			const ExtC& columns = {}
-		) : ref{std::data(data), rows, columns} {
-			if constexpr(is_array_v<T>) {
-				std::copy_n(elements.begin(), elements.size(), data.begin());
-			} else {
-				data = elements;
-				ref = {std::data(data), rows, columns};
-			}
-		}
+        auto ref() const { return RefType<const T> { std::data(data) }; }
+        auto ref() { return RefType<T> { std::data(data) }; }
 
-		template <Container C>
-		MatrixObject(
-			const C& elements,
-			const ExtR& rows = {},
-			const ExtC& columns = {}
-		) : ref{std::data(data), rows, columns} {
-			if constexpr(is_array_v<T>) {
-				std::copy_n(elements.begin(), elements.size(), data.begin());
-			} else {
-				data = elements;
-				ref = {std::data(data), rows, columns};
-			}
-		}
+        template <Matrix M>
+        StaticMatrixObject& operator = (const M& m) { ref() = m; return *this; }
 
-		template <Matrix M>
-		requires (
-			(ExtR::is_static() && ExtC::is_static()) ||
-			(!ExtR::is_static() && !ExtC::is_static())
-		)
-		void operator= (const M& m) {
-			if constexpr(!ExtR::is_static() && !ExtC::is_static()) {
-				resize(m.row_count().get(), m.column_count().get());
-			}
-			for(IndexType row = 0; row < ref.row_count().get(); ++row)
-				for(IndexType column = 0; column < ref.column_count().get(); ++column)
-					(*this)[row, column] = m[row, column];
-		}
-		
-		T::value_type& operator[] (IndexType row, IndexType column) { return ref[row, column]; }
-		const T::value_type& operator[] (IndexType row, IndexType column) const { return ref[row, column]; }
+        auto& operator [] (IndexType row, IndexType column) { return ref()[row, column]; }
+        const auto& operator [] (IndexType row, IndexType column) const { return ref()[row, column]; }
+        auto row_count() const { return ref().row_count(); }
+        auto column_count() const { return ref().column_count(); }
+    };
 
-		auto row_count() const { return ref.row_count(); }
-		auto column_count() const { return ref.column_count(); }
+    template <typename T, bool ColumnMajor>
+    struct DynamicMatrixObject {
+        std::vector<T> data;
+        IndexType rows;
+        IndexType columns;
 
-		template<typename Filler = typename T::value_type> requires (!ExtR::is_static() && !ExtC::is_static())
-		void resize(IndexType rows, IndexType columns, const Filler& filler_value = static_cast<Filler>(0)) {
-			T data_old = data;
-			decltype(ref) ref_old = {std::data(data_old), ref.row_count(), ref.column_count()};
-			IndexType copy_rows = std::min(ref.row_count().get(), rows);
-			IndexType copy_columns = std::min(ref.column_count().get(), columns);
-			data.resize(rows*columns);
-			ref = {std::data(data), rows, columns};
-			for(IndexType row = 0; row < copy_rows; ++row) {
-				for(IndexType column = 0; column < copy_columns; ++column)
-					ref[row, column] = ref_old[row, column];
-				for(IndexType column = copy_columns; column < columns; ++column)
-					ref[row, column] = filler_value;
-			}
-			for(IndexType row = copy_rows; row < rows; ++row) {
-				for(IndexType column = 0; column < columns; ++column)
-					ref[row, column] = filler_value;
-			}
-		}
-	};
+        DynamicMatrixObject()
+            : DynamicMatrixObject(0, 0)
+        {}
+
+        DynamicMatrixObject(const DynamicMatrixObject&) = default;
+        DynamicMatrixObject(DynamicMatrixObject&& other) { *this = std::move(other); }
+
+        template <Matrix M>
+        DynamicMatrixObject(const M& m) { *this = m; }
+
+        DynamicMatrixObject(IndexType rows, IndexType columns)
+            : data(rows * columns)
+            , rows { rows }
+            , columns { columns }
+        {}
+
+        DynamicMatrixObject(std::initializer_list<T> elements, IndexType rows, IndexType columns)
+            : DynamicMatrixObject(rows, columns)
+        {
+            std::copy(elements.begin(), elements.end(), std::back_inserter(data));
+        }
+
+        void resize(IndexType rows, IndexType columns) {
+            DynamicMatrixObject other { rows, columns };
+            other.ref() = ref();
+            *this = std::move(other);
+        }
+
+        DynamicMatrixObject& operator = (DynamicMatrixObject&& other) {
+            data = std::move(other.data);
+            rows = std::exchange(other.rows, 0);
+            columns = std::exchange(other.columns, 0);
+            return *this;
+        }
+
+        template <Matrix M>
+        DynamicMatrixObject& operator = (const M& m) {
+            resize(m.row_count().get(), m.column_count().get());
+            ref() = m;
+            return *this;
+        }
+
+        template <typename U>
+        using RefType = MatrixRef<U, DynamicExtent, DynamicExtent, ColumnMajor>;
+
+        auto ref() const { return RefType<const T> { std::data(data), rows, columns }; }
+        auto ref() { return RefType<T> { std::data(data), rows, columns }; }
+
+        auto& operator [] (IndexType row, IndexType column) { return ref()[row, column]; }
+        const auto& operator [] (IndexType row, IndexType column) const { return ref()[row, column]; }
+        auto row_count() const { return ref().row_count(); }
+        auto column_count() const { return ref().column_count(); }
+    };
 
 	template <IndexType Rows, IndexType Columns, typename T = float, bool ColumnMajor = false>
 	inline auto mat(std::initializer_list<T> elements) {
-		return MatrixObject<std::array<T, Rows*Columns>, StaticExtent<Rows>, StaticExtent<Columns>, ColumnMajor> { elements, {}, {} };
+		return StaticMatrixObject<T, Rows, Columns, ColumnMajor> { elements };
 	}
 
 	template <IndexType Rows, IndexType Columns, Container T, bool ColumnMajor = false>
 	inline auto mat(const T& container) {
-		return MatrixObject<std::array<typename T::value_type, Rows*Columns>, StaticExtent<Rows>, StaticExtent<Columns>, ColumnMajor> { container, {}, {} };
+		return StaticMatrixObject<T, Rows, Columns, ColumnMajor> { { container } };
 	}
 
 	template <typename T, bool ColumnMajor = false>
 	inline auto mat(std::initializer_list<T> elements, IndexType rows, IndexType columns) {
-		return MatrixObject<std::vector<T>, DynamicExtent, DynamicExtent, ColumnMajor> { elements, rows, columns };
+		return DynamicMatrixObject<T, ColumnMajor> { elements, rows, columns };
 	}
 
 	template <Container T, bool ColumnMajor = false>
 	inline auto mat(const T& container, IndexType rows, IndexType columns) {
-		return MatrixObject<std::vector<typename T::value_type>, DynamicExtent, DynamicExtent, ColumnMajor> { container, rows, columns };
+		return DynamicMatrixObject<T, ColumnMajor> { container, rows, columns };
 	}
 
-	template <IndexType Rows, IndexType Columns, Container T, bool ColumnMajor = false>
-	using mat_static_container_t = decltype(mat<Rows, Columns, T, ColumnMajor>(T{}));
-
 	template <IndexType Rows, IndexType Columns, typename T, bool ColumnMajor = false>
-	using mat_static_t = decltype(mat<Rows, Columns, T, ColumnMajor>(std::initializer_list<T>{}));
-
-	template <Container T, bool ColumnMajor = false>
-	using mat_dynamic_container_t = decltype(mat<T, ColumnMajor>(T{}, 0, 0));
+	using mat_static_t = StaticMatrixObject<T, Rows, Columns, ColumnMajor>;
 
 	template <typename T, bool ColumnMajor = false>
-	using mat_dynamic_t = decltype(mat<T, ColumnMajor>(std::initializer_list<T>{}, 0, 0));
+	using mat_dynamic_t = DynamicMatrixObject<T, ColumnMajor>;
 
 	template <Matrix L, Matrix R>
 	struct AugmentedMatrix {
@@ -814,8 +799,10 @@ namespace Maths {
 
 	template <Matrix M>
 	constexpr auto inverse_gauss_jordan(const M& m) {
-		return split_right(rref(augment(m, mat_identity(m.row_count().get(), m.column_count().get()))), m.column_count().get());
+        auto r = rref(augment(m, mat_identity(m.row_count().get(), m.column_count().get())));
+		return split_right(r, m.column_count().get());
 		//return augment(m, mat_identity(m.row_count().get(), m.column_count().get()));
+        //return rref(augment(m, mat_identity(m.row_count().get(), m.column_count().get())));
 	}
 
 	/*template <MatrixStatic M>
