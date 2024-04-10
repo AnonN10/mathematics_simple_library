@@ -78,6 +78,15 @@ int main() {
 
 	print(inverse_gauss_jordan(transform));
 
+	print(mat_DFT<4>());
+	print(mat_DFT(4));
+
+	mat_dynamic_t<float> igj = mat({1, 2, 3, 4, 5, 6, 7, 8}, 2, 4);
+	mat_dynamic_t<float> rthr = mat({10, 20, 30, 40}, 2, 2);
+	print(igj);
+	print(rthr);
+	print(kronecker_product(igj, rthr));
+
 	/*mat_dynamic_t<float> mattest({1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}, 4, 4);
 	print(mattest);
 	print(submatrix(mattest, 2, 0));

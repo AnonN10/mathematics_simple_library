@@ -283,6 +283,40 @@ namespace Maths {
 		return mat_hadamard_identity<T>(rows, columns);
 	}
 
+	template <typename T, Extent ExtD>
+	struct DiscreteFourierTransformMatrix {
+		ExtD dimension;
+
+		using Field = std::complex<T>;
+
+		constexpr DiscreteFourierTransformMatrix(const ExtD& dimension = {})
+			: dimension(dimension)
+		{}
+
+		constexpr Field operator[] ([[maybe_unused]] IndexType row, [[maybe_unused]] IndexType column) const {
+			constexpr Field i = Field(static_cast<T>(0), static_cast<T>(1));
+			constexpr T pi = std::numbers::pi_v<T>;
+			
+			//std::sqrt is not constexpr until C++26
+			const/*expr*/ T norm = static_cast<T>(1)/std::sqrt(static_cast<T>(dimension.get()));
+			const/*expr*/ Field omega = std::exp(static_cast<T>(-2) * pi * i / Field(static_cast<T>(dimension.get())));
+			
+			return std::pow(omega, static_cast<T>(column*row))*norm;
+		}
+
+		constexpr auto row_count() const { return dimension; }
+		constexpr auto column_count() const { return dimension; }
+	};
+
+	template <IndexType Dimension, typename T = float>
+	constexpr auto mat_DFT() {
+		return DiscreteFourierTransformMatrix<T, StaticExtent<Dimension>> {};
+	}
+	template <typename T = float>
+	constexpr auto mat_DFT(IndexType dimension) {
+		return DiscreteFourierTransformMatrix<T, DynamicExtent> { dimension };
+	}
+
 	template <typename Field, Extent ExtR, Extent ExtC, bool ColumnMajor>
 	struct MatrixRef {
 		Field* base_ptr;
@@ -418,11 +452,12 @@ namespace Maths {
         MatrixObjectDynamic(std::initializer_list<T> elements, IndexType rows, IndexType columns)
             : MatrixObjectDynamic(rows, columns)
         {
-            std::copy(elements.begin(), elements.end(), std::back_inserter(data));
+			std::copy(elements.begin(), elements.end(), data.begin());
         }
 
         void resize(IndexType rows, IndexType columns) {
             MatrixObjectDynamic other { rows, columns };
+			//FIXME: operator= not called
             other.ref() = ref();
             *this = std::move(other);
         }
@@ -729,7 +764,7 @@ namespace Maths {
 		using value_type = std::remove_reference_t<decltype(m[0,0])>;
 		constexpr auto zero = static_cast<value_type>(0);
 		if constexpr (Rows::is_static() && Columns::is_static()) {
-			if constexpr (Rows::get() == 1){
+			if constexpr (Rows::get() == 1) {
 				return m[0, 0];
 			} else if constexpr (Rows::get() == 2) {
 				return m[0, 0]*m[1, 1] - m[0, 1]*m[1, 0];
@@ -826,6 +861,28 @@ namespace Maths {
 
 	template <IndexType Column, Matrix M>
 	constexpr auto column_of(const M& m) { return RowOf<M, StaticExtent<Column>> { transpose(m) }; }
+
+	template <Matrix L, Matrix R>
+	struct KroneckerProduct {
+		L left;
+		R right;
+
+		constexpr KroneckerProduct(const L& l, const R& r)
+			: left(l), right(r)
+		{}
+
+		constexpr auto operator[] (IndexType row, IndexType column) const {
+			return
+				left[row/right.row_count().get(), column/right.column_count().get()] *
+				right[row%right.row_count().get(), column%right.column_count().get()];
+		}
+
+		constexpr auto row_count() const { return left.row_count()*right.row_count(); }
+		constexpr auto column_count() const { return left.column_count()*right.column_count(); }
+	};
+
+	template <Matrix L, Matrix R>
+	constexpr auto kronecker_product(const L& l, const R& r) { return KroneckerProduct<L, R> { l, r }; };
 
 	template <Matrix L, Matrix R>
 	struct MatrixMultiplication {
