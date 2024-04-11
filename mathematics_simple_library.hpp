@@ -856,8 +856,12 @@ namespace Maths {
 				right[row%right.row_count().get(), column%right.column_count().get()];
 		}
 
-		constexpr auto row_count() const { return left.row_count()*right.row_count(); }
-		constexpr auto column_count() const { return left.column_count()*right.column_count(); }
+		constexpr auto row_count() const {
+			return evaluate_extent(left.row_count(), right.row_count(), std::multiplies<>{});
+		}
+		constexpr auto column_count() const {
+			return evaluate_extent(left.column_count(), right.column_count(), std::multiplies<>{});
+		}
 	};
 
 	template <Matrix L, Matrix R>
@@ -1015,26 +1019,48 @@ namespace Maths {
 		return DiscreteFourierTransformMatrix<T, DynamicExtent> { dimension };
 	}
 
+	template <Extent Dimension, typename T = float>
+	constexpr auto mat_walsh_sylvester([[maybe_unused]]IndexType dimension) {
+		if constexpr (Dimension::is_static()) {
+			if constexpr (Dimension::get() == 1) {
+				//Hadamard matrix of order 1
+				return mat<1, 1, T>({1});
+			} else if constexpr (Dimension::get() == 2) {
+				//Hadamard matrix of order 2
+				return mat<2, 2, T>({
+					1,  1,
+					1, -1,
+				});
+			} else {
+				//Hadamard matrix of order N
+				auto H_2 = mat_walsh_sylvester<StaticExtent<2>, T>(0);
+				auto H_n = mat_walsh_sylvester<StaticExtent<Dimension::get()/2>, T>(0);
+				return kronecker_product(H_2, H_n);
+			}
+		} else {
+			if (dimension==1) {
+				return mat<T>({1}, 1, 1);
+			} else if (dimension==2) {
+				return mat<T>({ 1,  1, 1, -1, }, 2, 2);
+			} else {
+				auto H_2 = mat_walsh_sylvester<DynamicExtent, T>(2);
+				auto H_n = mat_walsh_sylvester<DynamicExtent, T>(dimension/2);
+				mat_dynamic_t<T> ret = kronecker_product(H_2, H_n);
+				return ret;
+			}
+		}
+	}
+
+	template <IndexType Dimension, typename T = float>
+	constexpr auto mat_walsh_sylvester() {
+		static_assert(is_power_of_two(Dimension));
+		return mat_walsh_sylvester<StaticExtent<Dimension>, T>(0);
+	}
+
 	template <typename T = float>
 	inline auto mat_walsh_sylvester(IndexType dimension) {
 		assert(is_power_of_two(dimension));
-
-		if (dimension==1) {
-			//Hadamard matrix of order 1
-			return mat<T>({1}, 1, 1);
-		} else if (dimension==2) {
-			//Hadamard matrix of order 2
-			return mat<T>({
-				1,  1,
-				1, -1,
-			}, 2, 2);
-		} else {
-			//Hadamard matrix of order N
-			auto H_2 = mat_walsh_sylvester<T>(2);
-			auto H_n = mat_walsh_sylvester<T>(dimension/2);
-			mat_dynamic_t<T> ret = kronecker_product(H_2, H_n);
-			return ret;
-		}
+		return mat_walsh_sylvester<DynamicExtent, T>(dimension);
 	}
 
 	template <Vector V>

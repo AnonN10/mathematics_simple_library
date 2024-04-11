@@ -20,13 +20,14 @@ int main() {
 	PRINT_EXEC(print(mat_DFT<4>()));
 	PRINT_EXEC(print(mat_DFT(4)));
 	PRINT_EXEC(print(mat_walsh_sylvester<int>(8)));
+	PRINT_EXEC(print(mat_walsh_sylvester<8, int>()));
 	std::cout << std::endl;
 
 	std::cout << "## matrix reference (user-defined storage) ##" << std::endl;
 	PRINT_EXEC(print(mat_ref<2,3>({1, 2, 3, 4, 5, 6,})));
 
 	PRINT_EXEC(std::array a = {1, 2, 3, 4});
-	PRINT_EXEC(std::array b = {4, 3, 2, 1});
+	PRINT_EXEC(std::vector b = {4, 3, 2, 1});
 	PRINT_EXEC(print(mat_ref<4,1>(a)));
 	PRINT_EXEC(print(mat_ref<1,4>(b)));
 	PRINT_EXEC(print(mat_ref<4,1>(a)*mat_ref<1,4>(b)));
@@ -59,7 +60,7 @@ int main() {
 	PRINT_EXEC(print(mat_identity(4,4)/translation(vec_ref({4, 5, 6}))));
 
 	PRINT_EXEC(mat_dynamic_t<float> mat_kp_left = mat({1, 2, 3, 4, 5, 6, 7, 8}, 2, 4));
-	PRINT_EXEC(mat_dynamic_t<float> mat_kp_right = mat({10, 20, 30, 40}, 2, 2));
+	PRINT_EXEC(mat_static_t<2,2,float> mat_kp_right = mat<2,2>({10, 20, 30, 40}));
 	PRINT_EXEC(print(mat_kp_left));
 	PRINT_EXEC(print(mat_kp_right));
 	PRINT_EXEC(print(kronecker_product(mat_kp_left, mat_kp_right)));
