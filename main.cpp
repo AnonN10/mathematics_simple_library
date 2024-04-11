@@ -1,5 +1,6 @@
 #include <iostream>
 #include <iomanip>
+#include <cstdlib>
 
 #include "mathematics_simple_library.hpp"
 
@@ -14,6 +15,8 @@ int main() {
 
 	std::cout << "## procedural matrix ##" << std::endl;
 	PRINT_EXEC(print(mat_identity<4, 5>()));
+	PRINT_EXEC(print(mat_zero<2, 2>()));
+	PRINT_EXEC(print(mat_one<2, 2>()));
 	PRINT_EXEC(print(mat_DFT<4>()));
 	PRINT_EXEC(print(mat_DFT(4)));
 	std::cout << std::endl;
@@ -52,6 +55,15 @@ int main() {
 	PRINT_EXEC(print(vec_ref({1, 2, 3, 1}) * transpose(translation(vec_ref({4, 5, 6})))));
 	PRINT_EXEC(std::cout << dot(vec_ref({1, 2, 3}), vec_ref({4, 5, 6})) << std::endl);
 	PRINT_EXEC(print(translation(vec_ref({4, 5, 6})) * 2.0f));
+	PRINT_EXEC(print(mat_identity(4,4)/translation(vec_ref({4, 5, 6}))));
+
+	PRINT_EXEC(mat_dynamic_t<float> mat_kp_left = mat({1, 2, 3, 4, 5, 6, 7, 8}, 2, 4));
+	PRINT_EXEC(mat_dynamic_t<float> mat_kp_right = mat({10, 20, 30, 40}, 2, 2));
+	PRINT_EXEC(print(mat_kp_left));
+	PRINT_EXEC(print(mat_kp_right));
+	PRINT_EXEC(print(kronecker_product(mat_kp_left, mat_kp_right)));
+	
+	PRINT_EXEC(print(hadamard_product(mat({1, 2, 3, 4}, 2, 2), mat({2, 5, 10, 100}, 2, 2))));
 	std::cout << std::endl;
 	
 	std::cout << "# transformation matrices #" << std::endl;
@@ -79,26 +91,13 @@ int main() {
 
 	PRINT_EXEC(std::cout << determinant(transform) << std::endl);
 	PRINT_EXEC(std::cout << determinant(mat_identity<4, 4>()) << std::endl);
-	PRINT_EXEC(std::cout << determinant(mobj_static) << std::endl);
-	PRINT_EXEC(std::cout << determinant(mobj_dynamic) << std::endl);
+	PRINT_EXEC(std::cout << det(mobj_static) << std::endl);
+	PRINT_EXEC(std::cout << det(mobj_dynamic) << std::endl);
 
-	std::cout << "inverse transform:" << std::endl;
-	print(inv(transform));
-	std::cout << "product:" << std::endl;
-	print(mat_identity(4,4)/transform);
-
-	//print(rref(augment(transform, mat_identity(4,4))));
-	//print(rref(augment(mobj_dynamic, mat_identity(4,4))));
-	//print(split_right(rref(augment(mobj_dynamic, mat_identity(4,4))), 4));
-	print(inverse_gauss_jordan(mobj_dynamic));
-
-	print(inverse_gauss_jordan(transform));
-
-	mat_dynamic_t<float> igj = mat({1, 2, 3, 4, 5, 6, 7, 8}, 2, 4);
-	mat_dynamic_t<float> rthr = mat({10, 20, 30, 40}, 2, 2);
-	print(igj);
-	print(rthr);
-	print(kronecker_product(igj, rthr));
+	PRINT_EXEC(print(inverse(transform)));
+	PRINT_EXEC(print(inv(transform)*transform));
+	PRINT_EXEC(print(inverse_gauss_jordan(transform)));
+	PRINT_EXEC(print(inverse_gauss_jordan(transform_dynamic)));
 
 	/*mat_dynamic_t<float> mattest({1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}, 4, 4);
 	print(mattest);
@@ -209,5 +208,5 @@ int main() {
 	std::cout << "abc*2 via std::transform(...):" << std::endl;
 	print_matrix(abc);*/
 	
-    return 0;
+    return EXIT_SUCCESS;
 }
