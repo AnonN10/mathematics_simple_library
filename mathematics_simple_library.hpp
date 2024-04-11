@@ -207,7 +207,7 @@ namespace Maths {
 	constexpr auto row_count_static() { return decltype(std::declval<M>().row_count())::get(); }
 	template <Matrix M>
 	constexpr auto column_count_static() { return decltype(std::declval<M>().column_count())::get(); }
-
+	
 	enum class MatrixIdentityType {
 		Additive,
 		Multiplicative,
@@ -286,40 +286,6 @@ namespace Maths {
 	template <typename T = float>
 	constexpr auto mat_one(IndexType rows, IndexType columns) {
 		return mat_hadamard_identity<T>(rows, columns);
-	}
-
-	template <typename T, Extent ExtD>
-	struct DiscreteFourierTransformMatrix {
-		ExtD dimension;
-
-		using Field = std::complex<T>;
-
-		constexpr DiscreteFourierTransformMatrix(const ExtD& dimension = {})
-			: dimension(dimension)
-		{}
-
-		constexpr Field operator[] ([[maybe_unused]] IndexType row, [[maybe_unused]] IndexType column) const {
-			constexpr Field i = Field(static_cast<T>(0), static_cast<T>(1));
-			constexpr T pi = std::numbers::pi_v<T>;
-			
-			//std::sqrt is not constexpr until C++26
-			const/*expr*/ T norm = static_cast<T>(1)/std::sqrt(static_cast<T>(dimension.get()));
-			const/*expr*/ Field omega = std::exp(static_cast<T>(-2) * pi * i / Field(static_cast<T>(dimension.get())));
-			
-			return std::pow(omega, static_cast<T>(column*row))*norm;
-		}
-
-		constexpr auto row_count() const { return dimension; }
-		constexpr auto column_count() const { return dimension; }
-	};
-
-	template <IndexType Dimension, typename T = float>
-	constexpr auto mat_DFT() {
-		return DiscreteFourierTransformMatrix<T, StaticExtent<Dimension>> {};
-	}
-	template <typename T = float>
-	constexpr auto mat_DFT(IndexType dimension) {
-		return DiscreteFourierTransformMatrix<T, DynamicExtent> { dimension };
 	}
 
 	template <typename Field, Extent ExtR, Extent ExtC, bool ColumnMajor>
@@ -1013,6 +979,62 @@ namespace Maths {
 	template <Matrix L, typename Field>
 	constexpr auto operator- (const L& l, const Field& r) {
 		return MatrixScalarBinaryOperation<L, Field, std::minus<>> { l, r };
+	}
+
+	template <typename T, Extent ExtD>
+	struct DiscreteFourierTransformMatrix {
+		ExtD dimension;
+
+		using Field = std::complex<T>;
+
+		constexpr DiscreteFourierTransformMatrix(const ExtD& dimension = {})
+			: dimension(dimension)
+		{}
+
+		constexpr Field operator[] ([[maybe_unused]] IndexType row, [[maybe_unused]] IndexType column) const {
+			constexpr Field i = Field(static_cast<T>(0), static_cast<T>(1));
+			constexpr T pi = std::numbers::pi_v<T>;
+			
+			//std::sqrt is not constexpr until C++26
+			const/*expr*/ T norm = static_cast<T>(1)/std::sqrt(static_cast<T>(dimension.get()));
+			const/*expr*/ Field omega = std::exp(static_cast<T>(-2) * pi * i / Field(static_cast<T>(dimension.get())));
+			
+			return std::pow(omega, static_cast<T>(column*row))*norm;
+		}
+
+		constexpr auto row_count() const { return dimension; }
+		constexpr auto column_count() const { return dimension; }
+	};
+
+	template <IndexType Dimension, typename T = float>
+	constexpr auto mat_DFT() {
+		return DiscreteFourierTransformMatrix<T, StaticExtent<Dimension>> {};
+	}
+	template <typename T = float>
+	constexpr auto mat_DFT(IndexType dimension) {
+		return DiscreteFourierTransformMatrix<T, DynamicExtent> { dimension };
+	}
+
+	template <typename T = float>
+	inline auto mat_walsh_sylvester(IndexType dimension) {
+		assert(is_power_of_two(dimension));
+
+		if (dimension==1) {
+			//Hadamard matrix of order 1
+			return mat<T>({1}, 1, 1);
+		} else if (dimension==2) {
+			//Hadamard matrix of order 2
+			return mat<T>({
+				1,  1,
+				1, -1,
+			}, 2, 2);
+		} else {
+			//Hadamard matrix of order N
+			auto H_2 = mat_walsh_sylvester<T>(2);
+			auto H_n = mat_walsh_sylvester<T>(dimension/2);
+			mat_dynamic_t<T> ret = kronecker_product(H_2, H_n);
+			return ret;
+		}
 	}
 
 	template <Vector V>

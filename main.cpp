@@ -19,6 +19,7 @@ int main() {
 	PRINT_EXEC(print(mat_one<2, 2>()));
 	PRINT_EXEC(print(mat_DFT<4>()));
 	PRINT_EXEC(print(mat_DFT(4)));
+	PRINT_EXEC(print(mat_walsh_sylvester<int>(8)));
 	std::cout << std::endl;
 
 	std::cout << "## matrix reference (user-defined storage) ##" << std::endl;
