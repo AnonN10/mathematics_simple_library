@@ -184,6 +184,11 @@ namespace Maths {
 		{ vector[element] };
 		{ vector.size() } -> Extent;
 	};
+	
+	template <typename V>
+	concept VectorStatic = Vector<V> && requires(const V& vector) {
+		{decltype(vector.size())::get()};
+	};
 
 	template <typename M>
 	concept Matrix = requires(const M& matrix, IndexType row, IndexType column) {
@@ -328,14 +333,21 @@ namespace Maths {
 		{}
 
 		template <Matrix M>
-		constexpr void operator= (const M& m) const {
+		constexpr void set_from(const M& m) const {
+			auto
+				rows_copy_extent = std::min(row_count().get(), m.row_count().get()),
+				column_copy_extent = std::min(column_count().get(), m.column_count().get());
+			for (IndexType row = 0; row < rows_copy_extent; ++row)
+				for (IndexType column = 0; column < column_copy_extent; ++column)
+					(*this)[row, column] = m[row, column];
+		}
+
+		template <Matrix M>
+		constexpr auto& operator= (const M& m) const {
 			assert_extent(m.row_count(), this->row_count(), std::equal_to<>{});
 			assert_extent(m.column_count(), this->column_count(), std::equal_to<>{});
-			for (IndexType row = 0; row < this->row_count().get(); ++row) {
-				for (IndexType column = 0; column < this->column_count().get(); ++column) {
-					(*this)[row, column] = m[row, column];
-				}
-			}
+			set_from(m);
+			return *this;
 		}
 
 		constexpr Field& operator[] (IndexType row, IndexType column) const {
@@ -441,7 +453,7 @@ namespace Maths {
         MatrixObjectDynamic(MatrixObjectDynamic&& other) { *this = std::move(other); }
 
         template <Matrix M>
-        MatrixObjectDynamic(const M& m) { *this = m; }
+        MatrixObjectDynamic(const M& m) : rows{0}, columns{0} { *this = m; }
 
         MatrixObjectDynamic(IndexType rows, IndexType columns)
             : data(rows * columns)
@@ -457,8 +469,9 @@ namespace Maths {
 
         void resize(IndexType rows, IndexType columns) {
             MatrixObjectDynamic other { rows, columns };
-			//FIXME: operator= not called
-            other.ref() = ref();
+			//move-assignment operator is preferred
+			//other.ref() = ref();
+			other.ref().set_from(ref());
             *this = std::move(other);
         }
 
@@ -1151,6 +1164,16 @@ namespace Maths {
 		return (as_row(a) * as_column(b))[0, 0];
 	}
 
+	template <Matrix M, VectorStatic V>
+	constexpr auto operator* (const M& m, const V& v) { return column_of<0>(m * as_column(v)); }
+	template <VectorStatic V, Matrix M>
+	constexpr auto operator* (const V& v, const M& m) { return row_of<0>(as_row(v) * m); }
+
+	template <Matrix M, Vector V>
+	constexpr auto operator* (const M& m, const V& v) { return column_of(m * as_column(v), 0); }
+	template <Vector V, Matrix M>
+	constexpr auto operator* (const V& v, const M& m) { return row_of(as_row(v) * m, 0); }
+
 	template <Matrix M>
 	inline void print(const M& mat, std::ostream& os = std::cout, std::streamsize spacing_width = 12) {
 		for (IndexType row = 0; row < mat.row_count().get(); ++row) {
@@ -1158,6 +1181,19 @@ namespace Maths {
 				os << std::setw(spacing_width) << mat[row, col] << ",";
 			os << std::endl;
 		}
+	}
+
+	template <Vector V>
+	inline void print(const V& vec, std::ostream& os = std::cout) {
+		if(!vec.size().get()) {
+			os << "()" << std::endl;
+			return;
+		}
+		std::cout << "(";
+		for (IndexType i = 0; i < vec.size().get()-1; ++i)
+			os << vec[i] << ", ";
+		os << vec[vec.size().get()-1];
+		os << ")" << std::endl;
 	}
 
 } // namespace Maths
