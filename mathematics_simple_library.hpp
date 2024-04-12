@@ -985,6 +985,80 @@ namespace Maths {
 		return MatrixScalarBinaryOperation<L, Field, std::minus<>> { l, r };
 	}
 
+	template <Matrix M>
+	constexpr auto min(const M& m) {
+		auto minimum = m[0,0];
+		for(IndexType row = 0; row < m.row_count().get(); ++row)
+			for(IndexType column = 0; column < m.column_count().get(); ++column)
+				if(minimum > m[row, column]) minimum = m[row, column];
+        return minimum;
+	}
+
+	template <Matrix M>
+	constexpr auto max(const M& m) {
+		auto maximum = m[0,0];
+		for(IndexType row = 0; row < m.row_count().get(); ++row)
+			for(IndexType column = 0; column < m.column_count().get(); ++column)
+				if(maximum < m[row, column]) maximum = m[row, column];
+        return maximum;
+	}
+
+	template <Matrix M>
+	constexpr auto norm_min(const M& m) {
+		using std::abs;
+		auto norm = abs(m[0,0]);
+		for(IndexType row = 0; row < m.row_count().get(); ++row)
+			for(IndexType column = 0; column < m.column_count().get(); ++column)
+				if(norm > abs(m[row, column])) norm = abs(m[row, column]);
+        return norm;
+	}
+
+	template <Matrix M>
+	constexpr auto norm_max(const M& m) {
+		using std::abs;
+		auto norm = abs(m[0,0]);
+		for(IndexType row = 0; row < m.row_count().get(); ++row)
+			for(IndexType column = 0; column < m.column_count().get(); ++column)
+				if(norm < abs(m[row, column])) norm = abs(m[row, column]);
+        return norm;
+	}
+
+	template <Matrix M>
+	constexpr auto norm_frobenius(const M& m) {
+		using std::sqrt;
+		auto sum = static_cast<std::remove_reference_t<decltype(m[0,0])>>(0);
+		for(IndexType row = 0; row < m.row_count().get(); ++row)
+			for(IndexType column = 0; column < m.column_count().get(); ++column)
+				sum += m[row, column] * m[row, column];
+        return sqrt(sum);
+	}
+	template <Matrix M>
+	constexpr auto norm_euclidean(const M& m) { return norm_frobenius(m); }
+	template <Matrix M>
+	constexpr auto norm(const M& m) { return norm_frobenius(m); }
+
+	template <Matrix M>
+	constexpr auto normalize_frobenius(const M& m) {
+        return m/norm_frobenius(m);
+	}
+	template <Matrix M>
+	constexpr auto normalize_euclidean(const M& m) { return normalize_frobenius(m); }
+	template <Matrix M>
+	constexpr auto normalize(const M& m) { return normalize_frobenius(m); }
+
+	template <Matrix M>
+	constexpr auto normalize_min(const M& m) { return m/std::remove_reference_t<decltype(m[0,0])>{norm_min(m)}; }
+
+	template <Matrix M>
+	constexpr auto normalize_max(const M& m) { return m/std::remove_reference_t<decltype(m[0,0])>{norm_max(m)}; }
+
+	template <Matrix M>
+	constexpr auto normalize_minmax(const M& m) {
+		auto minimum = min(m);
+		auto maximum = max(m);
+		return (m - minimum)/(maximum - minimum);
+	}
+
 	template <typename T, Extent ExtD>
 	struct DiscreteFourierTransformMatrix {
 		ExtD dimension;
@@ -1343,6 +1417,72 @@ namespace Maths {
 	constexpr auto operator+ (const V& l, const Field& r) { return VectorScalarBinaryOperation<V, Field, std::plus<>>{ l, r }; }
 	template <Vector V, typename Field>
 	constexpr auto operator- (const V& l, const Field& r) { return VectorScalarBinaryOperation<V, Field, std::minus<>>{ l, r }; }
+
+	template <Vector V>
+	constexpr auto min(const V& v) {
+		auto minimum = v[0];
+		for(IndexType i = 0; i < v.size().get(); ++i)
+			if(minimum > v[i]) minimum = v[i];
+        return minimum;
+	}
+
+	template <Vector V>
+	constexpr auto max(const V& v) {
+		auto maximum = v[0];
+		for(IndexType i = 0; i < v.size().get(); ++i)
+			if(maximum < v[i]) maximum = v[i];
+        return maximum;
+	}
+
+	template <Vector V>
+	constexpr auto norm_min(const V& v) {
+		using std::abs;
+		auto norm = abs(v[0]);
+		for(IndexType i = 0; i < v.size().get(); ++i)
+			if(norm > abs(v[i])) norm = abs(v[i]);
+        return norm;
+	}
+
+	template <Vector V>
+	constexpr auto norm_max(const V& v) {
+		using std::abs;
+		auto norm = abs(v[0]);
+		for(IndexType i = 0; i < v.size().get(); ++i)
+			if(norm < abs(v[i])) norm = abs(v[i]);
+        return norm;
+	}
+
+	template <Vector V>
+	constexpr auto norm_frobenius(const V& v) {
+		using std::sqrt;
+        return sqrt(dot(v, v));
+	}
+	template <Vector V>
+	constexpr auto norm_euclidean(const V& v) { return norm_frobenius(v); }
+	template <Vector V>
+	constexpr auto norm(const V& v) { return norm_frobenius(v); }
+
+	template <Vector V>
+	constexpr auto normalize_frobenius(const V& v) {
+        return v/norm_frobenius(v);
+	}
+	template <Vector V>
+	constexpr auto normalize_euclidean(const V& v) { return normalize_frobenius(v); }
+	template <Vector V>
+	constexpr auto normalize(const V& v) { return normalize_frobenius(v); }
+
+	template <Vector V>
+	constexpr auto normalize_min(const V& v) { return v/std::remove_reference_t<decltype(v[0])>{norm_min(v)}; }
+
+	template <Vector V>
+	constexpr auto normalize_max(const V& v) { return v/std::remove_reference_t<decltype(v[0])>{norm_max(v)}; }
+
+	template <Vector V>
+	constexpr auto normalize_minmax(const V& v) {
+		auto minimum = min(v);
+		auto maximum = max(v);
+		return (v - minimum)/(maximum - minimum);
+	}
 
 	template <Matrix M>
 	inline void print(const M& mat, std::ostream& os = std::cout, std::streamsize spacing_width = 12) {
