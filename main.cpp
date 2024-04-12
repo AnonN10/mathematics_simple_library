@@ -25,7 +25,6 @@ int main() {
 
 	std::cout << "## matrix reference (user-defined storage) ##" << std::endl;
 	PRINT_EXEC(print(mat_ref<2,3>({1, 2, 3, 4, 5, 6,})));
-
 	PRINT_EXEC(std::array a = {1, 2, 3, 4});
 	PRINT_EXEC(std::vector b = {4, 3, 2, 1});
 	PRINT_EXEC(print(mat_ref<4,1>(a)));
@@ -55,16 +54,26 @@ int main() {
 	PRINT_EXEC(print(translation(vec_ref({4, 5, 6})) * vec_ref({1, 2, 3, 1})));
 	PRINT_EXEC(print(as_row(vec_ref({1, 2, 3, 1})) * translation(vec_ref({4, 5, 6}))));
 	PRINT_EXEC(print(vec_ref({1, 2, 3, 1}) * transpose(translation(vec_ref({4, 5, 6})))));
+	PRINT_EXEC(print(vec_ref({1, 2, 3}) * vec_ref({4, 5, 6})));
+	PRINT_EXEC(print(vec_ref({1, 2, 3}) + vec_ref({4, 5, 6})));
+	PRINT_EXEC(print(vec_ref({1, 2, 3}) - vec_ref({4, 5, 6})));
+	PRINT_EXEC(print(vec_ref({1, 2, 3}) / vec_ref({4, 5, 6})));
+	PRINT_EXEC(print(vec_ref({1, 2, 3}) * 2));
+	PRINT_EXEC(print(2 * vec_ref({1, 2, 3})));
+	PRINT_EXEC(print(vec_ref({1, 2, 3}) / 2));
+	PRINT_EXEC(print(vec_ref({1, 2, 3}) + 2));
+	PRINT_EXEC(print(vec_ref({1, 2, 3}) - 2));
 	PRINT_EXEC(std::cout << dot(vec_ref({1, 2, 3}), vec_ref({4, 5, 6})) << std::endl);
+	PRINT_EXEC(print(cross(vec_ref({1, 0, 0}), vec_ref({0, 1, 0}))));
+	PRINT_EXEC(print(outer_product(vec_ref({1, 2, 3}), vec_ref({4, 5}))));
+	PRINT_EXEC(print(kronecker_product(vec_ref({1, 2, 3}), vec_ref({4, 5}))));
 	PRINT_EXEC(print(translation(vec_ref({4, 5, 6})) * 2.0f));
 	PRINT_EXEC(print(mat_identity(4,4)/translation(vec_ref({4, 5, 6}))));
-
 	PRINT_EXEC(mat_dynamic_t<float> mat_kp_left = mat({1, 2, 3, 4, 5, 6, 7, 8}, 2, 4));
 	PRINT_EXEC(mat_static_t<2,2,float> mat_kp_right = mat<2,2>({10, 20, 30, 40}));
 	PRINT_EXEC(print(mat_kp_left));
 	PRINT_EXEC(print(mat_kp_right));
 	PRINT_EXEC(print(kronecker_product(mat_kp_left, mat_kp_right)));
-	
 	PRINT_EXEC(print(hadamard_product(mat({1, 2, 3, 4}, 2, 2), mat({2, 5, 10, 100}, 2, 2))));
 	std::cout << std::endl;
 	
@@ -72,7 +81,6 @@ int main() {
 	PRINT_EXEC(print(scaling(vec_ref({1, 2, 3}))));
 	PRINT_EXEC(print(rotation(vec_ref({1, 0, 0}), vec_ref({0, 1, 0}), 3.14159265358979)));
 	PRINT_EXEC(print(translation(vec_ref({4, 5, 6}))));
-
 	PRINT_EXEC(mat_static_t<4,4,float> transform = mat_identity<4, 4>());
 	PRINT_EXEC(print(transform));
 	PRINT_EXEC(mat_dynamic_t<float> transform_dynamic = mat_identity<4, 4>());
@@ -90,16 +98,18 @@ int main() {
 	std::cout << std::endl;
 	
 	std::cout << "# function library #" << std::endl;
-
 	PRINT_EXEC(std::cout << determinant(transform) << std::endl);
 	PRINT_EXEC(std::cout << determinant(mat_identity<4, 4>()) << std::endl);
 	PRINT_EXEC(std::cout << det(mobj_static) << std::endl);
 	PRINT_EXEC(std::cout << det(mobj_dynamic) << std::endl);
-
 	PRINT_EXEC(print(inverse(transform)));
 	PRINT_EXEC(print(inv(transform)*transform));
 	PRINT_EXEC(print(inverse_gauss_jordan(transform)));
 	PRINT_EXEC(print(inverse_gauss_jordan(transform_dynamic)));
+	PRINT_EXEC(auto dftmat = mat_DFT<4>());
+	PRINT_EXEC(print(transpose(dftmat)));
+	PRINT_EXEC(print(transpose_hermitian(dftmat)));
+	PRINT_EXEC(print(transpose_hermitian(dftmat)*dftmat));
 
 	/*mat_dynamic_t<float> mattest({1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}, 4, 4);
 	print(mattest);

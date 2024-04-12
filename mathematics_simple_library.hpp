@@ -640,7 +640,7 @@ namespace Maths {
 		constexpr auto column_count() const { return matrix.column_count(); }
 	};
 
-	template <Matrix M> constexpr auto conjugate(const M& m) { return Conjugate(m); }
+	template <Matrix M> constexpr auto conjugate(const M& m) { return Conjugate{m}; }
 	template <Matrix M> constexpr auto conj(const M& m) { return conjugate(m); }
 	
 	template <Matrix M>
@@ -1208,8 +1208,74 @@ namespace Maths {
 	}
 
 	template <Vector A, Vector B>
-	constexpr auto dot(A a, B b) {
+	constexpr auto inner_product(const A& a, const B& b) {
 		return (as_row(a) * as_column(b))[0, 0];
+	}
+	template <Vector A, Vector B>
+	constexpr auto dot_product(const A& a, const B& b) { return inner_product(a, b); }
+	template <Vector A, Vector B>
+	constexpr auto dot(const A& a, const B& b) { return inner_product(a, b); }
+
+	template <Vector L, Vector R>
+	struct OuterProduct {
+		L left;
+		R right;
+
+		constexpr OuterProduct(const L& l, const R& r)
+			: left(l), right(r)
+		{}
+
+		constexpr auto operator[] (IndexType row, IndexType column) const {
+			return left[row]*right[column];
+		}
+
+		constexpr auto row_count() const { return left.size(); }
+		constexpr auto column_count() const { return right.size(); }
+	};
+
+	template <Vector L, Vector R>
+	constexpr auto outer_product(const L& l, const R& r) {
+		return OuterProduct{ l, r };
+	}
+
+	template <Vector L, Vector R>
+	struct CrossProduct {
+		L left;
+		R right;
+
+		constexpr CrossProduct(const L& l, const R& r)
+			: left(l), right(r)
+		{
+			assert_extent(left.size(), StaticExtent<3>{}, std::equal_to<>{});
+			assert_extent(right.size(), StaticExtent<3>{}, std::equal_to<>{});
+		}
+
+		constexpr auto operator[] (IndexType i) const {
+			switch(i) {
+				case 0: return left[1]*right[2] - left[2]*right[1];
+				case 1: return left[2]*right[0] - left[0]*right[2];
+				case 2: return left[0]*right[1] - left[1]*right[0];
+			}
+			return static_cast<std::remove_reference_t<decltype(left[0])>>(0);
+		}
+
+		constexpr auto size() const { return StaticExtent<3>{}; }
+	};
+
+	template <Vector L, Vector R>
+	constexpr auto cross_product(const L& l, const R& r) {
+		return CrossProduct{ l, r };
+	}
+	template <Vector L, Vector R>
+	constexpr auto cross(const L& l, const R& r) { return cross_product( l, r ); }
+	
+	template <Vector L, Vector R>
+	constexpr auto kronecker_product(const L& l, const R& r) {
+		return column_of(kronecker_product( as_column(l), as_column(r) ), 0);
+	}
+	template <VectorStatic L, VectorStatic R>
+	constexpr auto kronecker_product(const L& l, const R& r) {
+		return column_of<0>(kronecker_product( as_column(l), as_column(r) ));
 	}
 
 	template <Matrix M, VectorStatic V>
@@ -1221,6 +1287,62 @@ namespace Maths {
 	constexpr auto operator* (const M& m, const V& v) { return column_of(m * as_column(v), 0); }
 	template <Vector V, Matrix M>
 	constexpr auto operator* (const V& v, const M& m) { return row_of(as_row(v) * m, 0); }
+
+	template <Vector L, Vector R, typename BinaryOperator>
+	struct VectorComponentWiseBinaryOperation {
+		L left;
+		R right;
+    	BinaryOperator op;
+
+		constexpr VectorComponentWiseBinaryOperation(const L& l, const R& r, const BinaryOperator& op = {})
+			: left(l), right(r), op(op)
+		{
+			assert_extent(left.size(), right.size(), std::equal_to<>{});
+		}
+
+		constexpr auto operator[] (IndexType i) const {
+			return op(left[i], right[i]);
+		}
+
+		constexpr auto size() const { return left.size(); }
+	};
+
+	template <Vector L, Vector R>
+	constexpr auto operator* (const L& l, const R& r) { return VectorComponentWiseBinaryOperation<L, R, std::multiplies<>>{ l, r }; }
+	template <Vector L, Vector R>
+	constexpr auto operator/ (const L& l, const R& r) { return VectorComponentWiseBinaryOperation<L, R, std::divides<>>{ l, r }; }
+	template <Vector L, Vector R>
+	constexpr auto operator+ (const L& l, const R& r) { return VectorComponentWiseBinaryOperation<L, R, std::plus<>>{ l, r }; }
+	template <Vector L, Vector R>
+	constexpr auto operator- (const L& l, const R& r) { return VectorComponentWiseBinaryOperation<L, R, std::minus<>>{ l, r }; }
+
+	template <Vector L, typename Field, typename BinaryOperator>
+	struct VectorScalarBinaryOperation {
+		L left;
+		Field right;
+    	BinaryOperator op;
+
+		constexpr VectorScalarBinaryOperation(const L& l, const Field& r, const BinaryOperator& op = {})
+			: left(l), right(r), op(op)
+		{}
+
+		constexpr auto operator[] (IndexType i) const {
+			return op(left[i], right);
+		}
+
+		constexpr auto size() const { return left.size(); }
+	};
+
+	template <Vector V, typename Field>
+	constexpr auto operator* (const V& l, const Field& r) { return VectorScalarBinaryOperation<V, Field, std::multiplies<>>{ l, r }; }
+	template <typename Field, Vector V>
+	constexpr auto operator* (const Field& l, const V& r) { return VectorScalarBinaryOperation<V, Field, std::multiplies<>>{ r, l }; }
+	template <Vector V, typename Field>
+	constexpr auto operator/ (const V& l, const Field& r) { return VectorScalarBinaryOperation<V, Field, std::divides<>>{ l, r }; }
+	template <Vector V, typename Field>
+	constexpr auto operator+ (const V& l, const Field& r) { return VectorScalarBinaryOperation<V, Field, std::plus<>>{ l, r }; }
+	template <Vector V, typename Field>
+	constexpr auto operator- (const V& l, const Field& r) { return VectorScalarBinaryOperation<V, Field, std::minus<>>{ l, r }; }
 
 	template <Matrix M>
 	inline void print(const M& mat, std::ostream& os = std::cout, std::streamsize spacing_width = 12) {
