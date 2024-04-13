@@ -644,8 +644,9 @@ namespace Maths {
 
 		constexpr auto operator[] (IndexType row, IndexType column) const {
 			using value_type = std::remove_reference_t<decltype(matrix[0,0])>;
+			using std::conj;
 			if constexpr(is_complex_v<value_type>)
-				return std::conj(matrix[row, column]);
+				return conj(matrix[row, column]);
 			else
 				return matrix[row, column];
 		}
@@ -1084,7 +1085,7 @@ namespace Maths {
 		{}
 
 		constexpr Field operator[] ([[maybe_unused]] IndexType row, [[maybe_unused]] IndexType column) const {
-			constexpr Field i = Field(static_cast<T>(0), static_cast<T>(1));
+			constexpr Field i = Field(static_cast<T>(0.0), static_cast<T>(1.0));
 			constexpr T pi = std::numbers::pi_v<T>;
 			
 			//std::sqrt is not constexpr until C++26
