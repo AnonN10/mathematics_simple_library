@@ -457,19 +457,11 @@ namespace Maths {
             return *this;
         }
 
-        MatrixObjectDynamic& operator= (MatrixObjectDynamic& other) {
-            resize(other.row_count().get(), other.column_count().get());
-            ref() = other;
-            return *this;
+        MatrixObjectDynamic& operator= (const MatrixObjectDynamic& other) {
+            return (*this).template operator = <MatrixObjectDynamic>(other);
         }
-		/*template <Matrix M>
-        MatrixObjectDynamic& operator= (M& m) {
-            resize(m.row_count().get(), m.column_count().get());
-            ref() = m;
-            return *this;
-        }*/
 
-        template <Matrix M>
+		template <Matrix M>
         MatrixObjectDynamic& operator= (const M& m) {
             resize(m.row_count().get(), m.column_count().get());
             ref() = m;
