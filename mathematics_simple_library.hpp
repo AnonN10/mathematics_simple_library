@@ -657,11 +657,12 @@ namespace Maths {
 			else
 				return matrix[row, column];
 		}
+
 		constexpr auto row_count() const { return matrix.row_count(); }
 		constexpr auto column_count() const { return matrix.column_count(); }
 	};
 
-	template <Matrix M> constexpr auto conjugate(const M& m) { return Conjugate{m}; }
+	template <Matrix M> constexpr auto conjugate(const M& m) { return Conjugate<M> {m}; }
 	template <Matrix M> constexpr auto conj(const M& m) { return conjugate(m); }
 	
 	template <Matrix M>
