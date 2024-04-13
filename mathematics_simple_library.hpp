@@ -120,6 +120,11 @@ namespace Maths {
 			return StaticExtent<KnownSize * OtherSize> {};
 		}
 
+		template <IndexType OtherSize>
+		constexpr auto operator/ (const StaticExtent<OtherSize>&) const {
+			return StaticExtent<KnownSize / OtherSize> {};
+		}
+
 		static constexpr IndexType get() { return KnownSize; } 
 		static constexpr bool is_static() { return true; }
 	};
@@ -139,6 +144,10 @@ namespace Maths {
 
 		DynamicExtent operator* (const DynamicExtent& other) const {
 			return DynamicExtent { get() * other.get() };
+		}
+
+		DynamicExtent operator/ (const DynamicExtent& other) const {
+			return DynamicExtent { get() / other.get() };
 		}
 
 		constexpr IndexType get() const { return value; }
@@ -447,6 +456,18 @@ namespace Maths {
             columns = std::exchange(other.columns, 0);
             return *this;
         }
+
+        MatrixObjectDynamic& operator= (MatrixObjectDynamic& other) {
+            resize(other.row_count().get(), other.column_count().get());
+            ref() = other;
+            return *this;
+        }
+		/*template <Matrix M>
+        MatrixObjectDynamic& operator= (M& m) {
+            resize(m.row_count().get(), m.column_count().get());
+            ref() = m;
+            return *this;
+        }*/
 
         template <Matrix M>
         MatrixObjectDynamic& operator= (const M& m) {
@@ -1242,7 +1263,7 @@ namespace Maths {
 
 	template <Container T, bool ColumnMajor = false>
 	constexpr auto vec_ref(T& container) {
-		return vec_ref<T, ColumnMajor>(std::data(container), std::size(container));
+		return vec_ref<typename T::value_type, ColumnMajor>(std::data(container), std::size(container));
 	}
 
 	template <Vector V>
@@ -1279,6 +1300,41 @@ namespace Maths {
 	template <Vector V>
 	constexpr auto as_column(const V& vector) {
 		return AsColumnVector<V>{ vector };
+	}
+
+	template <Vector V, Extent E, bool ColumnMajor = false>
+	struct VectorAsMatrix {
+		V vector;
+		E stride;
+
+		constexpr auto operator[] (IndexType row, IndexType column) const {
+			if constexpr (ColumnMajor) {
+				return vector[column*stride.get() + row];
+			} else {
+				return vector[row*stride.get() + column];
+			}
+		}
+
+		constexpr auto row_count() const {
+			if constexpr (!ColumnMajor)
+				return evaluate_extent(vector.size(), stride, std::divides<>{});
+			else return stride;
+		}
+		constexpr auto column_count() const {
+			if constexpr (ColumnMajor)
+				return evaluate_extent(vector.size(), stride, std::divides<>{});
+			else return stride;
+		}
+	};
+
+	template <Vector V, IndexType Stride, bool ColumnMajor = false>
+	constexpr auto as_matrix(const V& vector) {
+		return VectorAsMatrix<V, StaticExtent<Stride>, ColumnMajor>{ vector, {} };
+	}
+
+	template <Vector V, bool ColumnMajor = false>
+	constexpr auto as_matrix(const V& vector, IndexType stride) {
+		return VectorAsMatrix<V, DynamicExtent, ColumnMajor>{ vector, stride };
 	}
 
 	template <Vector A, Vector B>
