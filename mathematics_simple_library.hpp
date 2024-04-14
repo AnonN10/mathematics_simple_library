@@ -1076,22 +1076,23 @@ namespace Maths {
 
 	template <typename T, Extent ExtD>
 	struct DiscreteFourierTransformMatrix {
-		ExtD dimension;
-
 		using Field = std::complex<T>;
+
+		ExtD dimension;
+		T norm;
+		Field omega;
 
 		constexpr DiscreteFourierTransformMatrix(const ExtD& dimension = {})
 			: dimension(dimension)
-		{}
-
-		constexpr Field operator[] ([[maybe_unused]] IndexType row, [[maybe_unused]] IndexType column) const {
+		{
 			constexpr Field i = Field(static_cast<T>(0.0), static_cast<T>(1.0));
 			constexpr T pi = std::numbers::pi_v<T>;
 			
-			//std::sqrt is not constexpr until C++26
-			const/*expr*/ T norm = static_cast<T>(1)/std::sqrt(static_cast<T>(dimension.get()));
-			const/*expr*/ Field omega = std::exp(static_cast<T>(-2) * pi * i / Field(static_cast<T>(dimension.get())));
-			
+			norm = static_cast<T>(1)/std::sqrt(static_cast<T>(dimension.get()));
+			omega = std::exp(static_cast<T>(-2) * pi * i / Field(static_cast<T>(dimension.get())));
+		}
+
+		constexpr Field operator[] ([[maybe_unused]] IndexType row, [[maybe_unused]] IndexType column) const {
 			return std::pow(omega, static_cast<T>(column*row))*norm;
 		}
 
