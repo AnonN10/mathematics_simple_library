@@ -22,11 +22,11 @@ T random_range(T range_from, T range_to) {
 }
 
 int main() {
-	constexpr int matdim = 128;
+	constexpr int matdim = 512;
 	using complex_value_type = double;
 	std::cout << "Generating DFT and iDFT matrices..." << std::endl;
     mat_dynamic_t<std::complex<complex_value_type>> mat_DFT = Maths::mat_DFT<matdim, complex_value_type>();
-    mat_dynamic_t<std::complex<complex_value_type>> mat_iDFT = transpose_hermitian(mat_DFT);// / complex_value_type(matdim);
+    mat_dynamic_t<std::complex<complex_value_type>> mat_iDFT = transpose_hermitian(mat_DFT);
 	std::cout << "Generating white noise matrix..." << std::endl;
 	mat_dynamic_t<std::complex<complex_value_type>> mat;
 	mat.resize(matdim, matdim);
@@ -57,13 +57,11 @@ int main() {
 		}
 		
 	std::cout << "Transforming to frequency domain..." << std::endl;
-	mat = mat_DFT * mat;
-	mat = mat * transpose(mat_DFT);
+	mat = mat_DFT * mat * transpose(mat_DFT);
 	std::cout << "Applying filter..." << std::endl;
 	mat = hadamard_product(mat, mat_filter);
 	std::cout << "Transforming to time domain..." << std::endl;
-	mat = mat_iDFT * mat;
-	mat = mat * transpose(mat_iDFT);
+	mat = mat_iDFT * mat * transpose(mat_iDFT);
     
     std::vector<uint8_t> image_data(matdim * matdim);
 	
