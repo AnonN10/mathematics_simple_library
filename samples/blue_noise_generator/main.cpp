@@ -56,12 +56,17 @@ int main() {
 			) > radius? 1.0 : 0.0;
 		}
 		
+	// since expression templates operate on the data in-place,
+	// it's important to take caution for cases where you assign
+	// to the matrix object while operating in its contents,
+	// therefore a temporary object is constructed using Maths::mat()
+	// to prevent reading and writing to the same memory simultaneously
 	std::cout << "Transforming to frequency domain..." << std::endl;
-	mat = mat_DFT * mat * transpose(mat_DFT);
+	mat = Maths::mat(mat_DFT * mat) * transpose(mat_DFT);
 	std::cout << "Applying filter..." << std::endl;
-	mat = hadamard_product(mat, mat_filter);
+	mat = Maths::mat(hadamard_product(mat, mat_filter));
 	std::cout << "Transforming to time domain..." << std::endl;
-	mat = mat_iDFT * mat * transpose(mat_iDFT);
+	mat = Maths::mat(mat_iDFT * mat) * transpose(mat_iDFT);
     
     std::vector<uint8_t> image_data(matdim * matdim);
 	
@@ -73,7 +78,7 @@ int main() {
 			mat_out[m, n] = mat[m, n].real();
 		}
 	std::cout << "Transforming to image space..." << std::endl;
-	mat_out = normalize_minmax(mat_out);
+	mat_out = Maths::mat(normalize_minmax(mat_out));
     std::transform(
 		mat_out.data.begin(),
 		mat_out.data.end(),

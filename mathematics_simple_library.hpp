@@ -231,6 +231,9 @@ namespace Maths {
 	constexpr auto row_count_static() { return decltype(std::declval<M>().row_count())::get(); }
 	template <ConceptMatrix M>
 	constexpr auto column_count_static() { return decltype(std::declval<M>().column_count())::get(); }
+
+	template <ConceptMatrix M>
+	using matrix_value_type = std::remove_reference_t<decltype(std::declval<M>()[0,0])>;
 	
 	enum class MatrixIdentityType {
 		Additive,
@@ -513,6 +516,16 @@ namespace Maths {
 	template <ConceptContainer T, bool ColumnMajor = false>
 	inline auto mat(const T& container, IndexType rows, IndexType columns) {
 		return MatrixObjectDynamic<T, ColumnMajor> { container, rows, columns };
+	}
+
+	template <ConceptMatrixStatic M, typename T = matrix_value_type<M>, bool ColumnMajor = false>
+	inline auto mat(const M& m) {
+		return MatrixObjectStatic<T, row_count_static<M>(), column_count_static<M>(), ColumnMajor> { m };
+	}
+
+	template <ConceptMatrix M, typename T = matrix_value_type<M>, bool ColumnMajor = false>
+	inline auto mat(const M& m) {
+		return MatrixObjectDynamic<T, ColumnMajor> { m };
 	}
 
 	template <IndexType Rows, IndexType Columns, typename T, bool ColumnMajor = false>
@@ -826,7 +839,7 @@ namespace Maths {
 	template <ConceptExtent Rows, ConceptExtent Columns, ConceptMatrix M>
 	constexpr auto determinant(const M& m) {
 		assert_extent(m.row_count(), m.column_count(), std::equal_to<>{});
-		using value_type = std::remove_reference_t<decltype(m[0,0])>;
+		using value_type = matrix_value_type<M>;
 		constexpr auto zero = static_cast<value_type>(0);
 		if constexpr (Rows::is_static() && Columns::is_static()) {
 			if constexpr (Rows::get() == 1) {
@@ -1011,17 +1024,17 @@ namespace Maths {
 
 	template <ConceptMatrixObject L, ConceptMatrix R>
 	constexpr auto operator* (const L& l, const R& r) {
-		return L { MatrixMultiplication<decltype(l.ref()), R> { l.ref(), r } };
+		return MatrixMultiplication<decltype(l.ref()), R> { l.ref(), r };
 	}
 
 	template <ConceptMatrix L, ConceptMatrixObject R>
 	constexpr auto operator* (const L& l, const R& r) {
-		return R { MatrixMultiplication<L, decltype(r.ref())> { l, r.ref() } };
+		return MatrixMultiplication<L, decltype(r.ref())> { l, r.ref() };
 	}
 
 	template <ConceptMatrixObject L, ConceptMatrixObject R>
 	constexpr auto operator* (const L& l, const R& r) {
-		return L { MatrixMultiplication<decltype(l.ref()), decltype(r.ref())> { l.ref(), r.ref() } };
+		return MatrixMultiplication<decltype(l.ref()), decltype(r.ref())> { l.ref(), r.ref() };
 	}
 
 	template <ConceptMatrix L, ConceptMatrix R>
@@ -1031,17 +1044,17 @@ namespace Maths {
 
 	template <ConceptMatrixObject L, ConceptMatrix R>
 	constexpr auto operator/ (const L& l, const R& r) {
-		return L { l.ref() * inverse(r) };
+		return l.ref() * inverse(r);
 	}
 
 	template <ConceptMatrix L, ConceptMatrixObject R>
 	constexpr auto operator/ (const L& l, const R& r) {
-		return R { l * inverse(r.ref()) };
+		return l * inverse(r.ref());
 	}
 
 	template <ConceptMatrixObject L, ConceptMatrixObject R>
 	constexpr auto operator/ (const L& l, const R& r) {
-		return L { l.ref() * inverse(r.ref()) };
+		return l.ref() * inverse(r.ref());
 	}
 
 	template <ConceptMatrix L, ConceptMatrix R, typename BinaryOperator>
@@ -1072,17 +1085,17 @@ namespace Maths {
 
 	template <ConceptMatrixObject L, ConceptMatrix R>
 	constexpr auto operator+ (const L& l, const R& r) {
-		return L { MatrixComponentWiseBinaryOperation<decltype(l.ref()), R, std::plus<>> { l.ref(), r } };
+		return MatrixComponentWiseBinaryOperation<decltype(l.ref()), R, std::plus<>> { l.ref(), r };
 	}
 
 	template <ConceptMatrix L, ConceptMatrixObject R>
 	constexpr auto operator+ (const L& l, const R& r) {
-		return R { MatrixComponentWiseBinaryOperation<L, decltype(r.ref()), std::plus<>> { l, r.ref() } };
+		return MatrixComponentWiseBinaryOperation<L, decltype(r.ref()), std::plus<>> { l, r.ref() };
 	}
 
 	template <ConceptMatrixObject L, ConceptMatrixObject R>
 	constexpr auto operator+ (const L& l, const R& r) {
-		return L { MatrixComponentWiseBinaryOperation<decltype(l.ref()), decltype(r.ref()), std::plus<>> { l.ref(), r.ref() } };
+		return MatrixComponentWiseBinaryOperation<decltype(l.ref()), decltype(r.ref()), std::plus<>> { l.ref(), r.ref() };
 	}
 
 	template <ConceptMatrix L, ConceptMatrix R>
@@ -1092,17 +1105,17 @@ namespace Maths {
 
 	template <ConceptMatrixObject L, ConceptMatrix R>
 	constexpr auto operator- (const L& l, const R& r) {
-		return L { MatrixComponentWiseBinaryOperation<decltype(l.ref()), R, std::minus<>> { l.ref(), r } };
+		return MatrixComponentWiseBinaryOperation<decltype(l.ref()), R, std::minus<>> { l.ref(), r };
 	}
 
 	template <ConceptMatrix L, ConceptMatrixObject R>
 	constexpr auto operator- (const L& l, const R& r) {
-		return R { MatrixComponentWiseBinaryOperation<L, decltype(r.ref()), std::minus<>> { l, r.ref() } };
+		return MatrixComponentWiseBinaryOperation<L, decltype(r.ref()), std::minus<>> { l, r.ref() };
 	}
 
 	template <ConceptMatrixObject L, ConceptMatrixObject R>
 	constexpr auto operator- (const L& l, const R& r) {
-		return L { MatrixComponentWiseBinaryOperation<decltype(l.ref()), decltype(r.ref()), std::minus<>> { l.ref(), r.ref() } };
+		return MatrixComponentWiseBinaryOperation<decltype(l.ref()), decltype(r.ref()), std::minus<>> { l.ref(), r.ref() };
 	}
 
 	template <ConceptMatrix L, ConceptMatrix R>
@@ -1112,17 +1125,17 @@ namespace Maths {
 
 	template <ConceptMatrixObject L, ConceptMatrix R>
 	constexpr auto hadamard_product(const L& l, const R& r) {
-		return L { MatrixComponentWiseBinaryOperation<decltype(l.ref()), R, std::multiplies<>> { l.ref(), r } };
+		return MatrixComponentWiseBinaryOperation<decltype(l.ref()), R, std::multiplies<>> { l.ref(), r };
 	}
 
 	template <ConceptMatrix L, ConceptMatrixObject R>
 	constexpr auto hadamard_product(const L& l, const R& r) {
-		return R { MatrixComponentWiseBinaryOperation<L, decltype(r.ref()), std::multiplies<>> { l, r.ref() } };
+		return MatrixComponentWiseBinaryOperation<L, decltype(r.ref()), std::multiplies<>> { l, r.ref() };
 	}
 
 	template <ConceptMatrixObject L, ConceptMatrixObject R>
 	constexpr auto hadamard_product(const L& l, const R& r) {
-		return L { MatrixComponentWiseBinaryOperation<decltype(l.ref()), decltype(r.ref()), std::multiplies<>> { l.ref(), r.ref() } };
+		return MatrixComponentWiseBinaryOperation<decltype(l.ref()), decltype(r.ref()), std::multiplies<>> { l.ref(), r.ref() };
 	}
 
 	template <ConceptMatrix L, ConceptMatrix R>
@@ -1132,17 +1145,17 @@ namespace Maths {
 
 	template <ConceptMatrixObject L, ConceptMatrix R>
 	constexpr auto hadamard_division(const L& l, const R& r) {
-		return L { MatrixComponentWiseBinaryOperation<decltype(l.ref()), R, std::divides<>> { l.ref(), r } };
+		return MatrixComponentWiseBinaryOperation<decltype(l.ref()), R, std::divides<>> { l.ref(), r };
 	}
 
 	template <ConceptMatrix L, ConceptMatrixObject R>
 	constexpr auto hadamard_division(const L& l, const R& r) {
-		return R { MatrixComponentWiseBinaryOperation<L, decltype(r.ref()), std::divides<>> { l, r.ref() } };
+		return MatrixComponentWiseBinaryOperation<L, decltype(r.ref()), std::divides<>> { l, r.ref() };
 	}
 
 	template <ConceptMatrixObject L, ConceptMatrixObject R>
 	constexpr auto hadamard_division(const L& l, const R& r) {
-		return L { MatrixComponentWiseBinaryOperation<decltype(l.ref()), decltype(r.ref()), std::divides<>> { l.ref(), r.ref() } };
+		return MatrixComponentWiseBinaryOperation<decltype(l.ref()), decltype(r.ref()), std::divides<>> { l.ref(), r.ref() };
 	}
 
 	template <ConceptMatrix L, typename Field, typename BinaryOperator>
@@ -1172,7 +1185,7 @@ namespace Maths {
 
 	template <ConceptMatrixObject L, typename Field>
 	constexpr auto operator* (const L& l, const Field& r) {
-		return L { MatrixScalarBinaryOperation<decltype(l.ref()), Field, std::multiplies<>> { l.ref(), r } };
+		return MatrixScalarBinaryOperation<decltype(l.ref()), Field, std::multiplies<>> { l.ref(), r };
 	}
 	template <typename Field, ConceptMatrixObject R>
 	constexpr auto operator* (const Field& l, const R& r) { return r * l; }
@@ -1184,7 +1197,7 @@ namespace Maths {
 
 	template <ConceptMatrixObject L, typename Field>
 	constexpr auto operator/ (const L& l, const Field& r) {
-		return L { MatrixScalarBinaryOperation<decltype(l.ref()), Field, std::divides<>> { l.ref(), r } };
+		return MatrixScalarBinaryOperation<decltype(l.ref()), Field, std::divides<>> { l.ref(), r };
 	}
 
 	template <ConceptMatrix L, typename Field>
@@ -1196,7 +1209,7 @@ namespace Maths {
 
 	template <ConceptMatrixObject L, typename Field>
 	constexpr auto operator+ (const L& l, const Field& r) {
-		return L { MatrixScalarBinaryOperation<decltype(l.ref()), Field, std::plus<>> { l.ref(), r } };
+		return MatrixScalarBinaryOperation<decltype(l.ref()), Field, std::plus<>> { l.ref(), r };
 	}
 	template <typename Field, ConceptMatrixObject R>
 	constexpr auto operator+ (const Field& l, const R& r) { return r + l; }
@@ -1208,7 +1221,7 @@ namespace Maths {
 
 	template <ConceptMatrixObject L, typename Field>
 	constexpr auto operator- (const L& l, const Field& r) {
-		return L { MatrixScalarBinaryOperation<decltype(l.ref()), Field, std::minus<>> { l.ref(), r } };
+		return MatrixScalarBinaryOperation<decltype(l.ref()), Field, std::minus<>> { l.ref(), r };
 	}
 
 	template <ConceptMatrix M>
@@ -1252,7 +1265,7 @@ namespace Maths {
 	template <ConceptMatrix M>
 	constexpr auto norm_frobenius(const M& m) {
 		using std::sqrt;
-		auto sum = static_cast<std::remove_reference_t<decltype(m[0,0])>>(0);
+		auto sum = static_cast<matrix_value_type<M>>(0);
 		for(IndexType row = 0; row < m.row_count().get(); ++row)
 			for(IndexType column = 0; column < m.column_count().get(); ++column)
 				sum += m[row, column] * m[row, column];
@@ -1273,10 +1286,10 @@ namespace Maths {
 	constexpr auto normalize(const M& m) { return normalize_frobenius(m); }
 
 	template <ConceptMatrix M>
-	constexpr auto normalize_min(const M& m) { return m/std::remove_reference_t<decltype(m[0,0])>{norm_min(m)}; }
+	constexpr auto normalize_min(const M& m) { return m/matrix_value_type<M>{norm_min(m)}; }
 
 	template <ConceptMatrix M>
-	constexpr auto normalize_max(const M& m) { return m/std::remove_reference_t<decltype(m[0,0])>{norm_max(m)}; }
+	constexpr auto normalize_max(const M& m) { return m/matrix_value_type<M>{norm_max(m)}; }
 
 	template <ConceptMatrix M>
 	constexpr auto normalize_minmax(const M& m) {
@@ -1336,7 +1349,7 @@ namespace Maths {
 				//Hadamard matrix of order N
 				auto H_2 = mat_walsh_sylvester<StaticExtent<2>, T>(0);
 				auto H_n = mat_walsh_sylvester<StaticExtent<Dimension::get()/2>, T>(0);
-				return kronecker_product(H_2, H_n);
+				return mat(kronecker_product(H_2, H_n));
 			}
 		} else {
 			if (dimension==1) {
