@@ -43,31 +43,32 @@ int main() {
 		image_height = 1024,
 		seed_count = 64;
 	using seed_type = std::tuple<
-		Vector<2, std::int32_t>,//position (x, y), in image space [0; width)*[0; height)
-		Vector<3, float>//color
+		std::array<std::int32_t, 2>,//position (x, y), in image space [0; width)*[0; height)
+		std::array<float, 3>//color
 	>;
 	using cell_type = std::tuple<
 		seed_type*,//assigned seed
 		float//distance to assigned seed, in normalized resolution space [0; width)*[0; height)/max(width, height)
 	>;
 	//a matrix to store the distance field and the closest seed at each cell
-	Matrix<image_height, image_width, cell_type, true> mat_image;
+	mat_dynamic_t<cell_type>/*Matrix<image_height, image_width, cell_type, true>*/ mat_image;
+	mat_image.resize(image_height, image_width);
 	std::array<seed_type, seed_count> seeds;
 	for(auto&& seed : seeds) {
-		auto position = Vector<2, std::int32_t>({
+		auto position = std::array<std::int32_t, 2>({
 			random_range<std::int32_t>(0, image_width-1),
 			random_range<std::int32_t>(0, image_height-1),
 		});
 		seed = seed_type(
 			position,
-			Vector<3, float>({
+			{
 				random_range<float>(0.0, 1.0),
 				random_range<float>(0.0, 1.0),
 				random_range<float>(0.0, 1.0),
-			})
+			}
 		);
 		//row index is y, column index is x - hence y, x
-		auto&& cell = mat_image[position(1), position(0)];
+		auto&& cell = mat_image[position[1], position[0]];
 		//insert seed into the cell
 		std::get<0>(cell) = &seed;
 		std::get<1>(cell) = 0.0;
@@ -100,8 +101,8 @@ int main() {
 							//compute distance from current cell position to the sample's seed position in normalized resolution space
 							auto seed_pos = std::get<0>(*sample_seed);
 							float distance = distance_metric(
-								static_cast<float>(seed_pos(0)-static_cast<std::int32_t>(n))/static_cast<float>(max_dimension),
-								static_cast<float>(seed_pos(1)-static_cast<std::int32_t>(m))/static_cast<float>(max_dimension)
+								static_cast<float>(seed_pos[0]-static_cast<std::int32_t>(n))/static_cast<float>(max_dimension),
+								static_cast<float>(seed_pos[1]-static_cast<std::int32_t>(m))/static_cast<float>(max_dimension)
 							);
 							auto min_distance = std::get<1>(current_cell);
 							//if distance is smaller or is currently empty
@@ -120,29 +121,39 @@ int main() {
     std::vector<std::uint8_t> image_data_distance_field(image_width * image_height);
 	
 	std::cout << "Transforming to image space..." << std::endl;
-    auto matrix_elements = mat_image.get_v();
     std::transform(
-		matrix_elements.begin(),
-		matrix_elements.end(),
+		mat_image.data.begin(),
+		mat_image.data.end(),
 		image_data_voronoi.begin(),
 		[](auto in)->std::tuple<std::uint8_t, std::uint8_t, std::uint8_t> {
 			std::tuple<std::uint8_t, std::uint8_t, std::uint8_t> ret;
 			if(!std::get<0>(in)) return ret;
 			auto&& seed = *std::get<0>(in);
-			auto clamp_normalize = [](auto x)->std::uint8_t { return static_cast<std::uint8_t>(std::min(std::max(x, decltype(x)(0)), decltype(x)(1))*decltype(x)(255)); };
-			std::get<0>(ret) = clamp_normalize(std::get<1>(seed)(0));
-			std::get<1>(ret) = clamp_normalize(std::get<1>(seed)(1));
-			std::get<2>(ret) = clamp_normalize(std::get<1>(seed)(2));
+			auto clamp_normalize = [](auto x)->std::uint8_t {
+				return static_cast<std::uint8_t>(
+					std::min(
+						std::max(x, static_cast<decltype(x)>(0)),
+						static_cast<decltype(x)>(1)
+					)*static_cast<decltype(x)>(255)
+				);
+			};
+			std::get<0>(ret) = clamp_normalize(std::get<1>(seed)[0]);
+			std::get<1>(ret) = clamp_normalize(std::get<1>(seed)[1]);
+			std::get<2>(ret) = clamp_normalize(std::get<1>(seed)[2]);
 			return ret;
 		}
 	);
 	std::transform(
-		matrix_elements.begin(),
-		matrix_elements.end(),
+		mat_image.data.begin(),
+		mat_image.data.end(),
 		image_data_distance_field.begin(),
 		[](auto in)->std::uint8_t {
 			auto dist = std::get<1>(in);
-			return static_cast<std::uint8_t>(std::min(std::max(dist, decltype(dist)(0)), decltype(dist)(1))*decltype(dist)(255));
+			return static_cast<std::uint8_t>(
+				std::min(
+					std::max(dist, static_cast<decltype(dist)>(0)),
+					static_cast<decltype(dist)>(1)
+				)*static_cast<decltype(dist)>(255));
 		}
 	);
     

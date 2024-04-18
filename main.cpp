@@ -10,6 +10,52 @@ using namespace Maths;
 std::cout << "> " << #__VA_ARGS__ << std::endl;\
 __VA_ARGS__\
 
+template<typename T, std::size_t N>
+std::ostream &operator<<(std::ostream &os, const std::array<T, N>& arr) {
+	std::string out = "(";
+	if(!arr.empty()) {
+		for(std::size_t i = 0; i < arr.size() - 1; ++i)
+			out += std::to_string(arr[i]) + ", ";
+		out += std::to_string(arr.back());
+	}
+	out += ")";
+    return os << out;
+}
+
+template<typename T>
+std::ostream &operator<<(std::ostream &os, const std::vector<T>& vec) {
+	std::string out = "(";
+	if(!vec.empty()) {
+		for(std::size_t i = 0; i < vec.size() - 1; ++i)
+			out += std::to_string(vec[i]) + ", ";
+		out += std::to_string(vec.back());
+	}
+	out += ")";
+    return os << out;
+}
+
+template <ConceptVector V>
+std::ostream &operator<<(std::ostream &os, const V& vec) {
+	std::string out = "(";
+	if(vec.size().get() > 0) {
+		for(std::size_t i = 0; i < vec.size().get() - 1; ++i)
+			out += std::to_string(vec[i]) + ", ";
+		out += std::to_string(vec[vec.size().get()-1]);
+	}
+	out += ")";
+    return os << out;
+}
+
+template <ConceptMatrix M>
+std::ostream &operator<<(std::ostream &os, const M& mat) {
+	for (IndexType row = 0; row < mat.row_count().get(); ++row) {
+		for (IndexType col = 0; col < mat.column_count().get(); ++col)
+			os << std::setw(12) << mat[row, col] << ",";
+		os << std::endl;
+	}
+	return os;
+}
+
 int main() {
 	std::cout << std::fixed;
 
@@ -48,8 +94,24 @@ int main() {
 	PRINT_EXEC(mobj_dynamic = translation(vec_ref({4, 5, 6})) * scaling(vec_ref({1, 2, 3, 1})));
 	PRINT_EXEC(print(mobj_dynamic));
 	std::cout << std::endl;
+	
+	std::cout << "## temporary objects in expressions and underlying type casting via matrix object ##" << std::endl;
+	PRINT_EXEC(auto matrix_int = mat<2, 2>({1, 2, 3, 4}));
+	PRINT_EXEC(print(matrix_int));
+	PRINT_EXEC(print(mat<float>(matrix_int)));
+	PRINT_EXEC(matrix_int = mat(matrix_int * matrix_int));
+	PRINT_EXEC(print(matrix_int));
+	//PRINT_EXEC(auto matrix_array = mat<2, 2, std::array<int, 2>>({{0, 0}, {0, 1}, {1, 0}, {1, 1}}));
+	//PRINT_EXEC(print(matrix_array));
+	//PRINT_EXEC(auto matrix_array_float = mat<std::array<float, 2>>(matrix_array));
+	//PRINT_EXEC(print(matrix_array_float));
+	std::cout << std::endl;
 
-	std::cout << "# binary operators #" << std::endl;
+	std::cout << "## unary operators ##" << std::endl;
+	PRINT_EXEC(print(-translation(vec_ref({4, 5, 6}))));
+	std::cout << std::endl;
+
+	std::cout << "## binary operators ##" << std::endl;
 	PRINT_EXEC(print(translation(vec_ref({4, 5, 6})) * as_column(vec_ref({1, 2, 3, 1}))));
 	PRINT_EXEC(print(translation(vec_ref({4, 5, 6})) * vec_ref({1, 2, 3, 1})));
 	PRINT_EXEC(print(as_row(vec_ref({1, 2, 3, 1})) * translation(vec_ref({4, 5, 6}))));
@@ -76,8 +138,19 @@ int main() {
 	PRINT_EXEC(print(kronecker_product(mat_kp_left, mat_kp_right)));
 	PRINT_EXEC(print(hadamard_product(mat({1, 2, 3, 4}, 2, 2), mat({2, 5, 10, 100}, 2, 2))));
 	std::cout << std::endl;
+
+	std::cout << "## ternary operators ##" << std::endl;
+	PRINT_EXEC(print(vec({1, 2, 3})));
+	PRINT_EXEC(auto matrix_ternary_test = mat<2, 2, vec_static_t<2, float>>({{-3, -2}, {-1, 0}, {1, 2}, {3, 4}}));
+	PRINT_EXEC(std::cout << matrix_ternary_test << std::endl);
+	PRINT_EXEC(std::cout << typeid(matrix_value_type<decltype(clamp(matrix_ternary_test, -1.0f, 1.0f) * 2.0f)>).name() << std::endl);
+	PRINT_EXEC(std::cout << typeid(matrix_value_type<decltype(clamp(mat_kp_left, -1.0f, 1.0f) * 2.0f)>).name() << std::endl);
+	//PRINT_EXEC(mat<decltype(matrix_ternary_test), vec_static_t<2, float>, false>(matrix_ternary_test*2.0f));
+	//PRINT_EXEC(mat(matrix_ternary_test*2.0f));
+	PRINT_EXEC(std::cout << mobj_static*2.0f);
+	std::cout << std::endl;
 	
-	std::cout << "# transformation matrices #" << std::endl;
+	std::cout << "## transformation matrices ##" << std::endl;
 	PRINT_EXEC(print(scaling(vec_ref({1, 2, 3}))));
 	PRINT_EXEC(print(rotation(vec_ref({1, 0, 0}), vec_ref({0, 1, 0}), 3.14159265358979)));
 	PRINT_EXEC(print(translation(vec_ref({4, 5, 6}))));
@@ -97,7 +170,7 @@ int main() {
 	PRINT_EXEC(print(transform_dynamic));
 	std::cout << std::endl;
 	
-	std::cout << "# function library #" << std::endl;
+	std::cout << "## function library ##" << std::endl;
 	PRINT_EXEC(std::cout << determinant(transform) << std::endl);
 	PRINT_EXEC(std::cout << determinant(mat_identity<4, 4>()) << std::endl);
 	PRINT_EXEC(std::cout << det(mobj_static) << std::endl);

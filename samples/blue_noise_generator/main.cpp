@@ -58,7 +58,7 @@ int main() {
 		
 	// since expression templates operate on the data in-place,
 	// it's important to take caution for cases where you assign
-	// to the matrix object while operating in its contents,
+	// to the matrix object while operating on its contents,
 	// therefore a temporary object is constructed using Maths::mat()
 	// to prevent reading and writing to the same memory simultaneously
 	std::cout << "Transforming to frequency domain..." << std::endl;

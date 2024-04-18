@@ -93,6 +93,12 @@ namespace Maths {
 		{std::size(container)};
 	};
 
+	template <class T>
+	concept ConceptIterable = requires(T& object) {
+		{std::begin(object)};
+		{std::end(object)};
+	};
+
 	template <typename E>
 	concept ConceptExtent = requires (const E& extent) {
 		{ extent.get() } -> std::convertible_to<IndexType>;
@@ -208,6 +214,18 @@ namespace Maths {
 		{decltype(vector.size())::get()};
 	};
 
+	template <typename V>
+	concept ConceptVectorObject = ConceptVector<V> && ConceptReferenceWrapper<V>;
+
+	template <typename V>
+	concept ConceptVectorObjectStatic = ConceptVectorStatic<V> && ConceptReferenceWrapper<V>;
+
+	template <ConceptVector V>
+	constexpr auto size_static() { return decltype(std::declval<V>().size())::get(); }
+
+	template <ConceptVector V>
+	using vector_value_type = std::remove_reference_t<decltype(std::declval<V>()[0])>;
+
 	template <typename M>
 	concept ConceptMatrix = requires(const M& matrix, IndexType row, IndexType column) {
 		{ matrix[row, column] };
@@ -316,12 +334,12 @@ namespace Maths {
 	}
 
 	template <typename Field, ConceptExtent ExtR, ConceptExtent ExtC, bool ColumnMajor>
-	struct MatrixRef {
+	struct MatrixReference {
 		Field* base_ptr;
 		ExtR rows;
 		ExtC columns;
 
-		constexpr MatrixRef(Field* base_ptr, const ExtR& rows = {}, const ExtC& columns = {})
+		constexpr MatrixReference(Field* base_ptr, const ExtR& rows = {}, const ExtC& columns = {})
 			: base_ptr(base_ptr), rows(rows), columns(columns)
 		{}
 
@@ -332,7 +350,10 @@ namespace Maths {
 				column_copy_extent = std::min(column_count().get(), m.column_count().get());
 			for (IndexType row = 0; row < rows_copy_extent; ++row)
 				for (IndexType column = 0; column < column_copy_extent; ++column)
-					(*this)[row, column] = m[row, column];
+					if constexpr (ConceptIterable<matrix_value_type<M>>)
+						std::copy(std::begin(m[row, column]), std::end(m[row, column]), std::begin((*this)[row, column]));
+					else
+						(*this)[row, column] = static_cast<matrix_value_type<M>>(m[row, column]);
 		}
 
 		template <ConceptMatrix M>
@@ -359,22 +380,22 @@ namespace Maths {
 
 	template <typename T, bool ColumnMajor = false>
 	constexpr auto mat_ref(T* base_ptr, IndexType rows, IndexType columns) {
-		return MatrixRef<T, DynamicExtent, DynamicExtent, ColumnMajor> { base_ptr, rows, columns };
+		return MatrixReference<T, DynamicExtent, DynamicExtent, ColumnMajor> { base_ptr, rows, columns };
 	}
 
 	template <IndexType Rows, IndexType Columns, typename T = float, bool ColumnMajor = false>
 	constexpr auto mat_ref(T* base_ptr) {
-		return MatrixRef<T, StaticExtent<Rows>, StaticExtent<Columns>, ColumnMajor> { base_ptr, {}, {} };
+		return MatrixReference<T, StaticExtent<Rows>, StaticExtent<Columns>, ColumnMajor> { base_ptr, {}, {} };
 	}
 
 	template <typename T, bool ColumnMajor = false>
 	constexpr auto mat_ref(const T* base_ptr, IndexType rows, IndexType columns) {
-		return MatrixRef<const T, DynamicExtent, DynamicExtent, ColumnMajor> { base_ptr, rows, columns };
+		return MatrixReference<const T, DynamicExtent, DynamicExtent, ColumnMajor> { base_ptr, rows, columns };
 	}
 
 	template <IndexType Rows, IndexType Columns, typename T = float, bool ColumnMajor = false>
 	constexpr auto mat_ref(const T* base_ptr) {
-		return MatrixRef<const T, StaticExtent<Rows>, StaticExtent<Columns>, ColumnMajor> { base_ptr, {}, {} };
+		return MatrixReference<const T, StaticExtent<Rows>, StaticExtent<Columns>, ColumnMajor> { base_ptr, {}, {} };
 	}
 
 	template <IndexType Rows, IndexType Columns, typename T = float, bool ColumnMajor = false>
@@ -418,7 +439,7 @@ namespace Maths {
         MatrixObjectStatic(const M& m) { *this = m; }
 
         template <typename U>
-        using RefType = MatrixRef<U, StaticExtent<Rows>, StaticExtent<Columns>, ColumnMajor>;
+        using RefType = MatrixReference<U, StaticExtent<Rows>, StaticExtent<Columns>, ColumnMajor>;
 
         auto ref() const { return RefType<const T> { std::data(data) }; }
         auto ref() { return RefType<T> { std::data(data) }; }
@@ -487,7 +508,7 @@ namespace Maths {
         }
 
         template <typename U>
-        using RefType = MatrixRef<U, DynamicExtent, DynamicExtent, ColumnMajor>;
+        using RefType = MatrixReference<U, DynamicExtent, DynamicExtent, ColumnMajor>;
 
         auto ref() const { return RefType<const T> { std::data(data), rows, columns }; }
         auto ref() { return RefType<T> { std::data(data), rows, columns }; }
@@ -518,12 +539,32 @@ namespace Maths {
 		return MatrixObjectDynamic<T, ColumnMajor> { container, rows, columns };
 	}
 
-	template <ConceptMatrixStatic M, typename T = matrix_value_type<M>, bool ColumnMajor = false>
+	template <ConceptMatrixStatic M, bool ColumnMajor = false>
+	inline auto mat(const M& m) {
+		return MatrixObjectStatic<matrix_value_type<M>, row_count_static<M>(), column_count_static<M>(), ColumnMajor> { m };
+	}
+
+	template <ConceptMatrix M, bool ColumnMajor = false>
+	inline auto mat(const M& m) {
+		return MatrixObjectDynamic<matrix_value_type<M>, ColumnMajor> { m };
+	}
+
+	template <typename T, ConceptMatrixStatic M, bool ColumnMajor = false>
 	inline auto mat(const M& m) {
 		return MatrixObjectStatic<T, row_count_static<M>(), column_count_static<M>(), ColumnMajor> { m };
 	}
 
-	template <ConceptMatrix M, typename T = matrix_value_type<M>, bool ColumnMajor = false>
+	template <typename T, ConceptMatrix M, bool ColumnMajor = false>
+	inline auto mat(const M& m) {
+		return MatrixObjectDynamic<T, ColumnMajor> { m };
+	}
+
+	template <typename T, bool ColumnMajor, ConceptMatrixStatic M>
+	inline auto mat(const M& m) {
+		return MatrixObjectStatic<T, row_count_static<M>(), column_count_static<M>(), ColumnMajor> { m };
+	}
+
+	template <typename T, bool ColumnMajor, ConceptMatrix M>
 	inline auto mat(const M& m) {
 		return MatrixObjectDynamic<T, ColumnMajor> { m };
 	}
@@ -1224,6 +1265,67 @@ namespace Maths {
 		return MatrixScalarBinaryOperation<decltype(l.ref()), Field, std::minus<>> { l.ref(), r };
 	}
 
+	template <ConceptMatrix M, typename UnaryOperator>
+	struct MatrixUnaryOperation {
+		M matrix;
+    	UnaryOperator op;
+
+		constexpr MatrixUnaryOperation(const M& m, const UnaryOperator& op = {})
+			: matrix(m), op(op)
+		{}
+
+		constexpr auto operator[] (IndexType row, IndexType column) const {
+			return op(matrix[row, column]);
+		}
+
+		constexpr auto row_count() const { return matrix.row_count(); }
+		constexpr auto column_count() const { return matrix.column_count(); }
+	};
+
+	template <ConceptMatrix M>
+	constexpr auto operator- (const M& m) {
+		return MatrixUnaryOperation<M, std::negate<>> { m };
+	}
+
+	template <ConceptMatrixObject M>
+	constexpr auto operator- (const M& m) {
+		return MatrixUnaryOperation<decltype(m.ref()), std::negate<>> { m.ref() };
+	}
+
+	template <ConceptMatrix A, typename B, typename C, typename TernaryOperator>
+	struct MatrixTernaryOperation {
+		A matrix;
+		B b;
+		C c;
+    	TernaryOperator op;
+
+		constexpr MatrixTernaryOperation(const A& a, const B& b, const C& c, const TernaryOperator& op = {})
+			: matrix(a), b(b), c(c), op(op)
+		{}
+
+		constexpr auto operator[] (IndexType row, IndexType column) const {
+			return op(matrix[row, column], b, c);
+		}
+
+		constexpr auto row_count() const { return matrix.row_count(); }
+		constexpr auto column_count() const { return matrix.column_count(); }
+	};
+
+	template <ConceptMatrix A, typename B, typename C>
+	constexpr auto clamp(const A& m, B lower, C upper) {
+		auto op = [](auto x, auto lower, auto upper)->auto {
+			using std::clamp;
+			using Maths::clamp;
+			return clamp(x, lower, upper);
+		};
+		return MatrixTernaryOperation<A, B, C, decltype(op)> { m, lower, upper, op };
+	}
+
+	template <ConceptMatrixObject A, typename B, typename C>
+	constexpr auto clamp(const A& m, B lower, C upper) {
+		return clamp(m.ref(), lower, upper);
+	}
+
 	template <ConceptMatrix M>
 	constexpr auto min(const M& m) {
 		auto minimum = m[0,0];
@@ -1446,27 +1548,61 @@ namespace Maths {
 		return MatrixRotation<Field, U, V> { basis_u, basis_v, theta };
 	}
 
-	template <typename T, bool ColumnMajor = false>
+	template <typename Field, ConceptExtent E>
+	struct VectorReference {
+		Field* base_ptr;
+		E length;
+
+		constexpr VectorReference(Field* base_ptr, const E& size = {})
+			: base_ptr(base_ptr), length(size)
+		{}
+
+		template <ConceptVector V>
+		constexpr void set_from(const V& v) const {
+			auto copy_extent = std::min(size().get(), v.size().get());
+			for (IndexType i = 0; i < copy_extent; ++i)
+				if constexpr (ConceptIterable<vector_value_type<V>>)
+					std::copy(std::begin(v[i]), std::end(v[i]), std::begin((*this)[i]));
+				else
+					(*this)[i] = static_cast<vector_value_type<V>>(v[i]);
+		}
+
+		template <ConceptVector V>
+		constexpr auto& operator= (const V& v) const {
+			assert_extent(v.size(), this->size(), std::equal_to<>{});
+			set_from(v);
+			return *this;
+		}
+
+		constexpr Field& operator[] (IndexType element) const {
+			assert(element < this->size().get());
+			return base_ptr[element];
+		}
+
+		constexpr auto size() const { return length; }
+	};
+
+	template <typename T>
 	constexpr auto vec_ref(T* base_ptr, IndexType size) {
-		return row_of(mat_ref<T, ColumnMajor>(base_ptr, 1, size), 0);
+		return VectorReference<T, DynamicExtent> { base_ptr, size };
 	}
 
-	template <IndexType Size, typename T, bool ColumnMajor = false>
+	template <IndexType Size, typename T>
 	constexpr auto vec_ref(T* base_ptr) {
-		return row_of<0>(mat_ref<1, Size, T, ColumnMajor>(base_ptr));
+		return VectorReference<T, StaticExtent<Size>> { base_ptr };
 	}
 	
-	template <typename T, bool ColumnMajor = false>
+	template <typename T>
 	constexpr auto vec_ref(std::initializer_list<T> elements) {
-		return vec_ref<const T, ColumnMajor>(std::data(elements), std::size(elements));
+		return vec_ref<const T>(std::data(elements), std::size(elements));
 	}
 
-	template <typename T, IndexType N, bool ColumnMajor = false>
+	template <typename T, IndexType N>
 	constexpr auto vec_ref(const std::span<T, N>& span) {
 		if constexpr (N == std::dynamic_extent) {
-			return vec_ref<T, ColumnMajor>(span.data(), span.size());
+			return vec_ref<T>(span.data(), span.size());
 		} else {
-			return vec_ref<N, T, ColumnMajor>(span.data());
+			return vec_ref<N, T>(span.data());
 		}
 	}
 
@@ -1480,10 +1616,133 @@ namespace Maths {
 		return vec_ref(std::span { vector });
 	}
 
-	template <ConceptContainer T, bool ColumnMajor = false>
+	template <ConceptContainer T>
 	constexpr auto vec_ref(T& container) {
-		return vec_ref<typename T::value_type, ColumnMajor>(std::data(container), std::size(container));
+		return vec_ref<typename T::value_type>(std::data(container), std::size(container));
 	}
+
+    template <typename T, IndexType Size>
+    struct VectorObjectStatic {
+        std::array<T, Size> data;
+
+        VectorObjectStatic() = default;
+        VectorObjectStatic(const VectorObjectStatic&) = default;
+        VectorObjectStatic(std::initializer_list<T> elements) {
+            std::copy(elements.begin(), elements.end(), data.begin());
+        }
+
+        template <ConceptVector V>
+        VectorObjectStatic(const V& v) { *this = v; }
+
+        template <typename U>
+        using RefType = VectorReference<U, StaticExtent<Size>>;
+
+        auto ref() const { return RefType<const T> { std::data(data) }; }
+        auto ref() { return RefType<T> { std::data(data) }; }
+
+        template <ConceptVector V>
+        VectorObjectStatic& operator= (const V& v) { ref() = v; return *this; }
+
+        auto& operator[] (IndexType element) { return ref()[element]; }
+        const auto& operator[] (IndexType element) const { return ref()[element]; }
+        auto size() const { return ref().size(); }
+    };
+
+    template <typename T>
+    struct VectorObjectDynamic {
+        std::vector<T> data;
+
+        VectorObjectDynamic()
+            : VectorObjectDynamic(0, 0)
+        {}
+
+        VectorObjectDynamic(const VectorObjectDynamic&) = default;
+        VectorObjectDynamic(VectorObjectDynamic&& other) { *this = std::move(other); }
+
+        template <ConceptVector V>
+        VectorObjectDynamic(const V& v) { *this = v; }
+        VectorObjectDynamic(IndexType size) : data(size) {}
+
+        VectorObjectDynamic(std::initializer_list<T> elements)
+            : VectorObjectDynamic(elements.size())
+        {
+			std::copy(elements.begin(), elements.end(), data.begin());
+        }
+
+        void resize(IndexType size) { data.resize(size); }
+
+        VectorObjectDynamic& operator= (VectorObjectDynamic&& other) {
+            data = std::move(other.data);
+            return *this;
+        }
+
+        VectorObjectDynamic& operator= (const VectorObjectDynamic& other) {
+            return (*this).template operator= <VectorObjectDynamic>(other);
+        }
+
+		template <ConceptVector V>
+        VectorObjectDynamic& operator= (const V& v) {
+			data.resize(v.data.size());
+			std::copy(v.data.begin(), v.data.end(), data.begin());
+            return *this;
+        }
+
+        template <typename U>
+        using RefType = VectorReference<U, DynamicExtent>;
+
+        auto ref() const { return RefType<const T> {std::data(data), std::size(data)}; }
+        auto ref() { return RefType<T> { std::data(data), std::size(data) }; }
+
+        auto& operator[] (IndexType element) { return ref()[element]; }
+        const auto& operator[] (IndexType element) const { return ref()[element]; }
+        auto size() const { return ref().size(); }
+    };
+
+	template <IndexType Size, typename T = float>
+	inline auto vec(std::initializer_list<T> elements) {
+		return VectorObjectStatic<T, Size> { elements };
+	}
+
+	template <IndexType Size, ConceptContainer T>
+	inline auto vec(const T& container) {
+		return VectorObjectStatic<T, Size> { { container } };
+	}
+
+	template <typename T>
+	inline auto vec(std::initializer_list<T> elements) {
+		return VectorObjectDynamic<T> { elements };
+	}
+
+	template <ConceptContainer T>
+	inline auto vec(const T& container) {
+		return VectorObjectDynamic<T> { container };
+	}
+
+	template <ConceptVectorStatic V>
+	inline auto vec(const V& v) {
+		return VectorObjectStatic<vector_value_type<V>, size_static<V>()> { v };
+	}
+
+	template <ConceptVector V>
+	inline auto vec(const V& v) {
+		return VectorObjectDynamic<vector_value_type<V>> { v };
+	}
+
+	template <typename T, ConceptVectorStatic V>
+	inline auto vec(const V& v) {
+		return VectorObjectStatic<T, size_static<V>()> { v };
+	}
+
+	template <typename T, ConceptVector V>
+	inline auto vec(const V& v) {
+		return VectorObjectDynamic<T> { v };
+	}
+
+	template <IndexType Size, typename T>
+	using vec_static_t = VectorObjectStatic<T, Size>;
+
+	template <typename T>
+	using vec_dynamic_t = VectorObjectDynamic<T>;
 
 	template <ConceptVector V>
 	struct AsRowVector {
@@ -1564,6 +1823,16 @@ namespace Maths {
 	constexpr auto dot_product(const A& a, const B& b) { return inner_product(a, b); }
 	template <ConceptVector A, ConceptVector B>
 	constexpr auto dot(const A& a, const B& b) { return inner_product(a, b); }
+
+	template <ConceptVector A, typename B, typename C>
+	constexpr auto clamp(const A& v, B lower, C upper) {
+		return clamp(as_row(v), lower, upper);
+	}
+
+	template <ConceptVectorObject A, typename B, typename C>
+	constexpr auto clamp(const A& v, B lower, C upper) {
+		return clamp(as_row(v.ref()), lower, upper);
+	}
 
 	template <ConceptVector L, ConceptVector R>
 	struct OuterProduct {
@@ -1744,6 +2013,10 @@ namespace Maths {
 	constexpr auto norm_euclidean(const V& v) { return norm_frobenius(v); }
 	template <ConceptVector V>
 	constexpr auto norm(const V& v) { return norm_frobenius(v); }
+	template <ConceptVector V>
+	constexpr auto magnitude(const V& v) { return norm_frobenius(v); }
+	template <ConceptVector V>
+	constexpr auto length(const V& v) { return norm_frobenius(v); }
 
 	template <ConceptVector V>
 	constexpr auto normalize_frobenius(const V& v) {
