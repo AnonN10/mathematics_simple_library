@@ -205,6 +205,7 @@ namespace Maths {
 	
 	template <typename V>
 	concept ConceptVector = requires(const V& vector, IndexType element) {
+		typename V::value_type;
 		{ vector[element] };
 		{ vector.size() } -> ConceptExtent;
 	};
@@ -223,11 +224,9 @@ namespace Maths {
 	template <ConceptVector V>
 	constexpr auto size_static() { return decltype(std::declval<V>().size())::get(); }
 
-	template <ConceptVector V>
-	using vector_value_type = std::remove_reference_t<decltype(std::declval<V>()[0])>;
-
 	template <typename M>
 	concept ConceptMatrix = requires(const M& matrix, IndexType row, IndexType column) {
+		typename M::value_type;
 		{ matrix[row, column] };
 		{ matrix.row_count() } -> ConceptExtent;
 		{ matrix.column_count() } -> ConceptExtent;
@@ -249,9 +248,6 @@ namespace Maths {
 	constexpr auto row_count_static() { return decltype(std::declval<M>().row_count())::get(); }
 	template <ConceptMatrix M>
 	constexpr auto column_count_static() { return decltype(std::declval<M>().column_count())::get(); }
-
-	template <ConceptMatrix M>
-	using matrix_value_type = std::remove_reference_t<decltype(std::declval<M>()[0,0])>;
 	
 	enum class MatrixIdentityType {
 		Additive,
@@ -263,6 +259,8 @@ namespace Maths {
 	struct MatrixIdentity {
 		ExtR rows;
 		ExtC columns;
+
+		using value_type = Field;
 
 		constexpr MatrixIdentity(const ExtR& rows = {}, const ExtC& columns = {})
 			: rows(rows), columns(columns)
@@ -339,6 +337,8 @@ namespace Maths {
 		ExtR rows;
 		ExtC columns;
 
+		using value_type = Field;
+
 		constexpr MatrixReference(Field* base_ptr, const ExtR& rows = {}, const ExtC& columns = {})
 			: base_ptr(base_ptr), rows(rows), columns(columns)
 		{}
@@ -350,10 +350,10 @@ namespace Maths {
 				column_copy_extent = std::min(column_count().get(), m.column_count().get());
 			for (IndexType row = 0; row < rows_copy_extent; ++row)
 				for (IndexType column = 0; column < column_copy_extent; ++column)
-					if constexpr (ConceptIterable<matrix_value_type<M>>)
+					if constexpr (ConceptIterable<typename M::value_type>)
 						std::copy(std::begin(m[row, column]), std::end(m[row, column]), std::begin((*this)[row, column]));
 					else
-						(*this)[row, column] = static_cast<matrix_value_type<M>>(m[row, column]);
+						(*this)[row, column] = static_cast<typename M::value_type>(m[row, column]);
 		}
 
 		template <ConceptMatrix M>
@@ -429,6 +429,8 @@ namespace Maths {
     struct MatrixObjectStatic {
         std::array<T, Rows * Columns> data;
 
+		using value_type = T;
+
         MatrixObjectStatic() = default;
         MatrixObjectStatic(const MatrixObjectStatic&) = default;
         MatrixObjectStatic(std::initializer_list<T> elements) {
@@ -458,6 +460,8 @@ namespace Maths {
         std::vector<T> data;
         IndexType rows;
         IndexType columns;
+
+		using value_type = T;
 
         MatrixObjectDynamic()
             : MatrixObjectDynamic(0, 0)
@@ -541,12 +545,12 @@ namespace Maths {
 
 	template <ConceptMatrixStatic M, bool ColumnMajor = false>
 	inline auto mat(const M& m) {
-		return MatrixObjectStatic<matrix_value_type<M>, row_count_static<M>(), column_count_static<M>(), ColumnMajor> { m };
+		return MatrixObjectStatic<std::remove_const_t<typename M::value_type>, row_count_static<M>(), column_count_static<M>(), ColumnMajor> { m };
 	}
 
 	template <ConceptMatrix M, bool ColumnMajor = false>
 	inline auto mat(const M& m) {
-		return MatrixObjectDynamic<matrix_value_type<M>, ColumnMajor> { m };
+		return MatrixObjectDynamic<typename M::value_type, ColumnMajor> { m };
 	}
 
 	template <typename T, ConceptMatrixStatic M, bool ColumnMajor = false>
@@ -576,6 +580,7 @@ namespace Maths {
 	using mat_dynamic_t = MatrixObjectDynamic<T, ColumnMajor>;
 
 	template <ConceptMatrix L, ConceptMatrix R>
+	//requires (std::same_as<typename L::value_type, typename R::value_type>)
 	struct AugmentedMatrix {
 		L left;
 		R right;
@@ -589,6 +594,8 @@ namespace Maths {
 				return right[row, column - left.column_count().get()];
 			return left[row, column];
 		}
+
+		using value_type = decltype(std::declval<AugmentedMatrix<L, R>>()[0,0]);
 
 		constexpr auto row_count() const { return left.row_count(); }
 		constexpr auto column_count() const { return evaluate_extent(left.column_count(), right.column_count(), std::plus<>{}); }
@@ -615,6 +622,8 @@ namespace Maths {
 	struct SplitMatrix {
 		M matrix;
 		E split_bound;
+
+		using value_type = M::value_type;
 
 		constexpr SplitMatrix(const M& m, const E& split_bound = {}) : matrix(m), split_bound(split_bound) {
 			if constexpr (Vertical) {
@@ -703,7 +712,8 @@ namespace Maths {
 	
 	template <ConceptMatrix M>
 	struct ReducedRowEchelonMatrix {
-		using value_type = std::remove_reference_t<decltype(std::declval<M>()[0,0])>;
+		using value_type = M::value_type;
+		//using value_type = std::remove_reference_t<decltype(std::declval<M>()[0,0])>;
 		mat_dynamic_t<value_type> matrix;
 
 		ReducedRowEchelonMatrix(const M& m) : matrix(m.row_count().get(), m.column_count().get()) {
@@ -749,6 +759,8 @@ namespace Maths {
 	struct Conjugate {
 		M matrix;
 
+		using value_type = M::value_type;
+
 		constexpr auto operator[] (IndexType row, IndexType column) const {
 			using value_type = std::remove_reference_t<decltype(matrix[0,0])>;
 			using std::conj;
@@ -770,6 +782,9 @@ namespace Maths {
 	template <ConceptMatrix M>
 	struct Transpose {
 		M matrix;
+
+		using value_type = M::value_type;
+
 		constexpr auto operator[] (IndexType row, IndexType column) const { return matrix[column, row]; }
 		constexpr auto row_count() const { return matrix.column_count(); }
 		constexpr auto column_count() const { return matrix.row_count(); }
@@ -788,6 +803,8 @@ namespace Maths {
 		M matrix;
 		ErasedRow erased_row;
 		ErasedColumn erased_column;
+
+		using value_type = M::value_type;
 
 		constexpr Submatrix(const M& matrix, const ErasedRow& erased_row = {}, const ErasedColumn& erased_column = {})
 			: matrix(matrix), erased_row(erased_row), erased_column(erased_column)
@@ -815,6 +832,8 @@ namespace Maths {
 		M matrix;
 		std::vector<IndexType> erased_rows;
 		std::vector<IndexType> erased_columns;
+
+		using value_type = M::value_type;
 
 		SubmatrixDynamic(const M& matrix, IndexType erased_row, IndexType erased_column) : matrix(matrix)
 		{
@@ -880,7 +899,7 @@ namespace Maths {
 	template <ConceptExtent Rows, ConceptExtent Columns, ConceptMatrix M>
 	constexpr auto determinant(const M& m) {
 		assert_extent(m.row_count(), m.column_count(), std::equal_to<>{});
-		using value_type = matrix_value_type<M>;
+		using value_type = typename M::value_type;
 		constexpr auto zero = static_cast<value_type>(0);
 		if constexpr (Rows::is_static() && Columns::is_static()) {
 			if constexpr (Rows::get() == 1) {
@@ -930,6 +949,8 @@ namespace Maths {
 	struct Cofactor {
 		M matrix;
 
+		using value_type = M::value_type;
+
 		constexpr auto operator[] (IndexType row, IndexType column) const {
 			using value_type = std::remove_reference_t<decltype(matrix[0,0])>;
 			return static_cast<value_type>((row+column)&1?-1:1) * determinant(submatrix(matrix, row, column));
@@ -963,6 +984,8 @@ namespace Maths {
 		M matrix;
 		E row;
 
+		using value_type = M::value_type;
+
 		constexpr RowOf(const M& matrix, const E& row = {}) : matrix(matrix), row(row) {
 			assert_extent(row, matrix.row_count(), std::less<>{});
 		}
@@ -994,6 +1017,8 @@ namespace Maths {
 	struct KroneckerProduct {
 		L left;
 		R right;
+
+		using value_type = decltype(std::declval<typename L::value_type>() * std::declval<typename R::value_type>());
 
 		constexpr KroneckerProduct(const L& l, const R& r)
 			: left(l), right(r)
@@ -1037,6 +1062,8 @@ namespace Maths {
 	struct MatrixMultiplication {
 		L left;
 		R right;
+
+		using value_type = decltype(std::declval<typename L::value_type>() * std::declval<typename R::value_type>());
 
 		constexpr MatrixMultiplication(const L& l, const R& r) : left(l), right(r) {
 			assert_extent(left.column_count(), right.row_count(), std::equal_to<>{});
@@ -1103,6 +1130,8 @@ namespace Maths {
 		L left;
 		R right;
     	BinaryOperator op;
+
+		using value_type = std::invoke_result_t<BinaryOperator, typename L::value_type, typename R::value_type>;
 
 		constexpr MatrixComponentWiseBinaryOperation(const L& l, const R& r, const BinaryOperator& op = {})
 			: left(l), right(r), op(op)
@@ -1205,6 +1234,8 @@ namespace Maths {
 		Field right;
     	BinaryOperator op;
 
+		using value_type = std::invoke_result_t<BinaryOperator, typename L::value_type, Field>;
+
 		constexpr MatrixScalarBinaryOperation(const L& l, const Field& r, const BinaryOperator& op = {})
 			: left(l), right(r), op(op)
 		{}
@@ -1270,6 +1301,8 @@ namespace Maths {
 		M matrix;
     	UnaryOperator op;
 
+		using value_type = M::value_type;
+
 		constexpr MatrixUnaryOperation(const M& m, const UnaryOperator& op = {})
 			: matrix(m), op(op)
 		{}
@@ -1292,12 +1325,14 @@ namespace Maths {
 		return MatrixUnaryOperation<decltype(m.ref()), std::negate<>> { m.ref() };
 	}
 
-	template <ConceptMatrix A, typename B, typename C, typename TernaryOperator>
+	template <ConceptMatrix A, typename B, typename C, typename TernaryOperator, typename ReturnType>
 	struct MatrixTernaryOperation {
 		A matrix;
 		B b;
 		C c;
     	TernaryOperator op;
+
+		using value_type = ReturnType;//std::invoke_result_t<TernaryOperator, typename A::value_type, B, C>;
 
 		constexpr MatrixTernaryOperation(const A& a, const B& b, const C& c, const TernaryOperator& op = {})
 			: matrix(a), b(b), c(c), op(op)
@@ -1311,14 +1346,18 @@ namespace Maths {
 		constexpr auto column_count() const { return matrix.column_count(); }
 	};
 
+	template <typename A, typename B, typename C>
+	struct ClampOperator {
+		auto operator()(const A& x, B lower, C upper) const {
+			using std::clamp;
+			//using Maths::clamp;
+			return clamp(x, lower, upper);
+		}
+	};
+
 	template <ConceptMatrix A, typename B, typename C>
 	constexpr auto clamp(const A& m, B lower, C upper) {
-		auto op = [](auto x, auto lower, auto upper)->auto {
-			using std::clamp;
-			using Maths::clamp;
-			return clamp(x, lower, upper);
-		};
-		return MatrixTernaryOperation<A, B, C, decltype(op)> { m, lower, upper, op };
+		return MatrixTernaryOperation<A, B, C, ClampOperator<typename A::value_type,B,C>,typename A::value_type> { m, lower, upper, {} };
 	}
 
 	template <ConceptMatrixObject A, typename B, typename C>
@@ -1367,7 +1406,7 @@ namespace Maths {
 	template <ConceptMatrix M>
 	constexpr auto norm_frobenius(const M& m) {
 		using std::sqrt;
-		auto sum = static_cast<matrix_value_type<M>>(0);
+		auto sum = static_cast<typename M::value_type>(0);
 		for(IndexType row = 0; row < m.row_count().get(); ++row)
 			for(IndexType column = 0; column < m.column_count().get(); ++column)
 				sum += m[row, column] * m[row, column];
@@ -1388,10 +1427,10 @@ namespace Maths {
 	constexpr auto normalize(const M& m) { return normalize_frobenius(m); }
 
 	template <ConceptMatrix M>
-	constexpr auto normalize_min(const M& m) { return m/matrix_value_type<M>{norm_min(m)}; }
+	constexpr auto normalize_min(const M& m) { return m/typename M::value_type{norm_min(m)}; }
 
 	template <ConceptMatrix M>
-	constexpr auto normalize_max(const M& m) { return m/matrix_value_type<M>{norm_max(m)}; }
+	constexpr auto normalize_max(const M& m) { return m/typename M::value_type{norm_max(m)}; }
 
 	template <ConceptMatrix M>
 	constexpr auto normalize_minmax(const M& m) {
@@ -1402,23 +1441,23 @@ namespace Maths {
 
 	template <typename T, ConceptExtent ExtD>
 	struct DiscreteFourierTransformMatrix {
-		using Field = std::complex<T>;
+		using value_type = std::complex<T>;
 
 		ExtD dimension;
-		Field omega;
+		value_type omega;
 		T norm;
 
 		constexpr DiscreteFourierTransformMatrix(const ExtD& dimension = {})
 			: dimension(dimension)
 		{
-			constexpr Field i = Field(static_cast<T>(0), static_cast<T>(1));
+			constexpr value_type i = value_type(static_cast<T>(0), static_cast<T>(1));
 			constexpr T pi = std::numbers::pi_v<T>;
 			
-			omega = std::exp(static_cast<T>(-2) * pi * i / Field(static_cast<T>(dimension.get())));
+			omega = std::exp(static_cast<T>(-2) * pi * i / value_type(static_cast<T>(dimension.get())));
 			norm = static_cast<T>(1)/std::sqrt(static_cast<T>(dimension.get()));
 		}
 
-		constexpr Field operator[] ([[maybe_unused]] IndexType row, [[maybe_unused]] IndexType column) const {
+		constexpr value_type operator[] ([[maybe_unused]] IndexType row, [[maybe_unused]] IndexType column) const {
 			return std::pow(omega, static_cast<T>(column*row))*norm;
 		}
 
@@ -1483,6 +1522,8 @@ namespace Maths {
 	struct MatrixScaling {
 		V coefficients;
 
+		using value_type = V::value_type;
+
 		constexpr MatrixScaling(const V& coeffs) : coefficients(coeffs) {}
 
 		constexpr auto operator[] (IndexType row, IndexType column) const {
@@ -1501,6 +1542,8 @@ namespace Maths {
 	template <ConceptVector V>
 	struct MatrixTranslation {
 		V coefficients;
+
+		using value_type = V::value_type;
 
 		constexpr MatrixTranslation(const V& coeffs) : coefficients(coeffs) {}
 
@@ -1522,6 +1565,8 @@ namespace Maths {
 		U basis_u;
 		V basis_v;
 		Field theta;
+
+		using value_type = V::value_type;
 
 		MatrixRotation(const V& basis_u, const V& basis_v, Field theta)
 			: basis_u(basis_u), basis_v(basis_v), theta(theta)
@@ -1553,6 +1598,8 @@ namespace Maths {
 		Field* base_ptr;
 		E length;
 
+		using value_type = Field;
+
 		constexpr VectorReference(Field* base_ptr, const E& size = {})
 			: base_ptr(base_ptr), length(size)
 		{}
@@ -1561,10 +1608,10 @@ namespace Maths {
 		constexpr void set_from(const V& v) const {
 			auto copy_extent = std::min(size().get(), v.size().get());
 			for (IndexType i = 0; i < copy_extent; ++i)
-				if constexpr (ConceptIterable<vector_value_type<V>>)
+				if constexpr (ConceptIterable<typename V::value_type>)
 					std::copy(std::begin(v[i]), std::end(v[i]), std::begin((*this)[i]));
 				else
-					(*this)[i] = static_cast<vector_value_type<V>>(v[i]);
+					(*this)[i] = static_cast<typename V::value_type>(v[i]);
 		}
 
 		template <ConceptVector V>
@@ -1625,6 +1672,8 @@ namespace Maths {
     struct VectorObjectStatic {
         std::array<T, Size> data;
 
+		using value_type = T;
+
         VectorObjectStatic() = default;
         VectorObjectStatic(const VectorObjectStatic&) = default;
         VectorObjectStatic(std::initializer_list<T> elements) {
@@ -1651,6 +1700,8 @@ namespace Maths {
     template <typename T>
     struct VectorObjectDynamic {
         std::vector<T> data;
+
+		using value_type = T;
 
         VectorObjectDynamic()
             : VectorObjectDynamic(0, 0)
@@ -1720,12 +1771,12 @@ namespace Maths {
 
 	template <ConceptVectorStatic V>
 	inline auto vec(const V& v) {
-		return VectorObjectStatic<vector_value_type<V>, size_static<V>()> { v };
+		return VectorObjectStatic<typename V::value_type, size_static<V>()> { v };
 	}
 
 	template <ConceptVector V>
 	inline auto vec(const V& v) {
-		return VectorObjectDynamic<vector_value_type<V>> { v };
+		return VectorObjectDynamic<typename V::value_type> { v };
 	}
 
 	template <typename T, ConceptVectorStatic V>
@@ -1748,6 +1799,8 @@ namespace Maths {
 	struct AsRowVector {
 		V vector;
 
+		using value_type = V::value_type;
+
 		constexpr auto operator[] (IndexType row, IndexType column) const {
 			assert(row == 0);
 			return vector[column];
@@ -1765,6 +1818,8 @@ namespace Maths {
 	template <ConceptVector V>
 	struct AsColumnVector {
 		V vector;
+
+		using value_type = V::value_type;
 
 		constexpr auto operator[] (IndexType row, IndexType column) const {
 			assert(column == 0);
@@ -1784,6 +1839,8 @@ namespace Maths {
 	struct VectorAsMatrix {
 		V vector;
 		E stride;
+
+		using value_type = V::value_type;
 
 		constexpr auto operator[] (IndexType row, IndexType column) const {
 			if constexpr (ColumnMajor) {
@@ -1839,6 +1896,8 @@ namespace Maths {
 		L left;
 		R right;
 
+		using value_type = decltype(std::declval<typename L::value_type>() * std::declval<typename R::value_type>());
+
 		constexpr OuterProduct(const L& l, const R& r)
 			: left(l), right(r)
 		{}
@@ -1860,6 +1919,8 @@ namespace Maths {
 	struct CrossProduct {
 		L left;
 		R right;
+
+		using value_type = decltype(std::declval<typename L::value_type>() * std::declval<typename R::value_type>());
 
 		constexpr CrossProduct(const L& l, const R& r)
 			: left(l), right(r)
@@ -1920,6 +1981,8 @@ namespace Maths {
 		R right;
     	BinaryOperator op;
 
+		using value_type = std::invoke_result_t<BinaryOperator, typename L::value_type, typename R::value_type>;
+
 		constexpr VectorComponentWiseBinaryOperation(const L& l, const R& r, const BinaryOperator& op = {})
 			: left(l), right(r), op(op)
 		{
@@ -1947,6 +2010,8 @@ namespace Maths {
 		L left;
 		Field right;
     	BinaryOperator op;
+
+		using value_type = std::invoke_result_t<BinaryOperator, typename L::value_type, Field>;
 
 		constexpr VectorScalarBinaryOperation(const L& l, const Field& r, const BinaryOperator& op = {})
 			: left(l), right(r), op(op)
