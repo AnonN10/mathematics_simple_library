@@ -148,7 +148,12 @@ int main() {
 	PRINT_EXEC(std::cout << clamp(matrix_ternary_test, -1.0f, 1.0f) * 2.0f << std::endl);
 	PRINT_EXEC(std::cout << clamp(matrix_ternary_test, -1.0f, 1.0f) << std::endl);
 	//PRINT_EXEC(mat<decltype(matrix_ternary_test), vec_static_t<2, float>, false>(matrix_ternary_test*2.0f));
-	PRINT_EXEC(std::cout << mat(clamp(matrix_ternary_test, -1.0f, 1.0f)) << std::endl);
+	PRINT_EXEC(std::cout << typeid(decltype(clamp(matrix_ternary_test, -1.0f, 1.0f))).name() << std::endl);
+	PRINT_EXEC(std::cout << typeid(typename decltype(clamp(matrix_ternary_test, -1.0f, 1.0f))::value_type).name() << std::endl);
+	//PRINT_EXEC(std::cout << mat(clamp(matrix_ternary_test, -1.0f, 1.0f)) << std::endl);
+	PRINT_EXEC(std::cout << typeid(decltype(matrix_ternary_test * 2.0f)).name() << std::endl);
+	PRINT_EXEC(std::cout << typeid(typename decltype(matrix_ternary_test * 2.0f)::value_type).name() << std::endl);
+	//PRINT_EXEC(std::cout << mat(matrix_ternary_test * 2.0f) << std::endl);
 	PRINT_EXEC(std::cout << mobj_static*2.0f);
 	std::cout << std::endl;
 	

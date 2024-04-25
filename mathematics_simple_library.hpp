@@ -1234,7 +1234,7 @@ namespace Maths {
 		Field right;
     	BinaryOperator op;
 
-		using value_type = std::invoke_result_t<BinaryOperator, typename L::value_type, Field>;
+		using value_type = decltype(op(left.operator[](0,0), right));//std::invoke_result_t<BinaryOperator, typename L::value_type, Field>;
 
 		constexpr MatrixScalarBinaryOperation(const L& l, const Field& r, const BinaryOperator& op = {})
 			: left(l), right(r), op(op)
@@ -1325,14 +1325,14 @@ namespace Maths {
 		return MatrixUnaryOperation<decltype(m.ref()), std::negate<>> { m.ref() };
 	}
 
-	template <ConceptMatrix A, typename B, typename C, typename TernaryOperator, typename ReturnType>
+	template <ConceptMatrix A, typename B, typename C, typename TernaryOperator>
 	struct MatrixTernaryOperation {
 		A matrix;
 		B b;
 		C c;
     	TernaryOperator op;
 
-		using value_type = ReturnType;//std::invoke_result_t<TernaryOperator, typename A::value_type, B, C>;
+		using value_type = typename A::value_type;//decltype(std::declval<std::invoke_result_t<TernaryOperator, typename A::value_type, B, C>>().operator[](0));
 
 		constexpr MatrixTernaryOperation(const A& a, const B& b, const C& c, const TernaryOperator& op = {})
 			: matrix(a), b(b), c(c), op(op)
@@ -1346,18 +1346,14 @@ namespace Maths {
 		constexpr auto column_count() const { return matrix.column_count(); }
 	};
 
-	template <typename A, typename B, typename C>
-	struct ClampOperator {
-		auto operator()(const A& x, B lower, C upper) const {
-			using std::clamp;
-			//using Maths::clamp;
-			return clamp(x, lower, upper);
-		}
-	};
-
 	template <ConceptMatrix A, typename B, typename C>
 	constexpr auto clamp(const A& m, B lower, C upper) {
-		return MatrixTernaryOperation<A, B, C, ClampOperator<typename A::value_type,B,C>,typename A::value_type> { m, lower, upper, {} };
+		auto op = [](const auto& x, auto lower, auto upper)->auto {
+			using std::clamp;
+			using Maths::clamp;
+			return clamp(x, lower, upper);
+		};
+		return MatrixTernaryOperation<A, B, C, decltype(op)> { m, lower, upper, {} };
 	}
 
 	template <ConceptMatrixObject A, typename B, typename C>
@@ -2011,7 +2007,7 @@ namespace Maths {
 		Field right;
     	BinaryOperator op;
 
-		using value_type = std::invoke_result_t<BinaryOperator, typename L::value_type, Field>;
+		using value_type = decltype(op(left[0], right));//std::invoke_result_t<BinaryOperator, typename L::value_type, Field>;
 
 		constexpr VectorScalarBinaryOperation(const L& l, const Field& r, const BinaryOperator& op = {})
 			: left(l), right(r), op(op)
