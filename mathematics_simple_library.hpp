@@ -2146,13 +2146,23 @@ namespace Maths {
 	template <ConceptVector V, typename Field>
 	constexpr auto operator* (const V& l, const Field& r) { return VectorScalarBinaryOperation<V, Field, std::multiplies<>>{ l, r }; }
 	template <typename Field, ConceptVector V>
-	constexpr auto operator* (const Field& l, const V& r) { return VectorScalarBinaryOperation<V, Field, std::multiplies<>>{ r, l }; }
+	constexpr auto operator* (const Field& l, const V& r) { return r * l; }
+	template <ConceptVectorObject V, typename Field>
+	constexpr auto operator* (const V& l, const Field& r) { return l.ref() * r; }
 	template <ConceptVector V, typename Field>
 	constexpr auto operator/ (const V& l, const Field& r) { return VectorScalarBinaryOperation<V, Field, std::divides<>>{ l, r }; }
+	template <ConceptVectorObject V, typename Field>
+	constexpr auto operator/ (const V& l, const Field& r) { return l.ref() / r; }
 	template <ConceptVector V, typename Field>
 	constexpr auto operator+ (const V& l, const Field& r) { return VectorScalarBinaryOperation<V, Field, std::plus<>>{ l, r }; }
+	template <typename Field, ConceptVector V>
+	constexpr auto operator+ (const Field& l, const V& r) { return r + l; }
+	template <ConceptVectorObject V, typename Field>
+	constexpr auto operator+ (const V& l, const Field& r) { return l.ref() + r; }
 	template <ConceptVector V, typename Field>
 	constexpr auto operator- (const V& l, const Field& r) { return VectorScalarBinaryOperation<V, Field, std::minus<>>{ l, r }; }
+	template <ConceptVectorObject V, typename Field>
+	constexpr auto operator- (const V& l, const Field& r) { return l.ref() - r; }
 
 	template <ConceptVector V>
 	constexpr auto min(const V& v) {
