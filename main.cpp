@@ -101,7 +101,7 @@ int main() {
 	PRINT_EXEC(print(mat<float>(matrix_int)));
 	PRINT_EXEC(matrix_int = mat(matrix_int * matrix_int));
 	PRINT_EXEC(print(matrix_int));
-	PRINT_EXEC(auto matrix_of_vectors = mat<2, 2, vec_static_t<2, int>>({{0, 0}, {0, 1}, {1, 0}, {1, 1}}));
+	PRINT_EXEC(auto matrix_of_vectors = mat<2, 2, vec_static_t<2, int>>({{-3, -2}, {-1, 0}, {1, 2}, {3, 4}}));
 	PRINT_EXEC(print(matrix_of_vectors));
 	PRINT_EXEC(auto matrix_of_float_vectors = mat<vec_static_t<2, float>>(matrix_of_vectors));
 	PRINT_EXEC(print(matrix_of_float_vectors));
@@ -137,24 +137,16 @@ int main() {
 	PRINT_EXEC(print(mat_kp_right));
 	PRINT_EXEC(print(kronecker_product(mat_kp_left, mat_kp_right)));
 	PRINT_EXEC(print(hadamard_product(mat({1, 2, 3, 4}, 2, 2), mat({2, 5, 10, 100}, 2, 2))));
+	PRINT_EXEC(std::cout << mat(matrix_of_vectors * matrix_of_vectors) << std::endl);
 	std::cout << std::endl;
 
 	std::cout << "## ternary operators ##" << std::endl;
-	PRINT_EXEC(print(vec({1, 2, 3})));
-	PRINT_EXEC(auto matrix_ternary_test = mat<2, 2, vec_static_t<2, float>>({{-3, -2}, {-1, 0}, {1, 2}, {3, 4}}));
-	PRINT_EXEC(std::cout << matrix_ternary_test << std::endl);
-	//PRINT_EXEC(std::cout << typeid(matrix_value_type<decltype(clamp(matrix_ternary_test, -1.0f, 1.0f) * 2.0f)>).name() << std::endl);
-	//PRINT_EXEC(std::cout << typeid(matrix_value_type<decltype(clamp(mat_kp_left, -1.0f, 1.0f) * 2.0f)>).name() << std::endl);
-	PRINT_EXEC(std::cout << clamp(matrix_ternary_test, -1.0f, 1.0f) * 2.0f << std::endl);
-	PRINT_EXEC(std::cout << clamp(matrix_ternary_test, -1.0f, 1.0f) << std::endl);
-	//PRINT_EXEC(mat<decltype(matrix_ternary_test), vec_static_t<2, float>, false>(matrix_ternary_test*2.0f));
-	PRINT_EXEC(std::cout << typeid(decltype(clamp(matrix_ternary_test, -1.0f, 1.0f))).name() << std::endl);
-	PRINT_EXEC(std::cout << typeid(typename decltype(clamp(matrix_ternary_test, -1.0f, 1.0f))::value_type).name() << std::endl);
-	//PRINT_EXEC(std::cout << mat(clamp(matrix_ternary_test, -1.0f, 1.0f)) << std::endl);
-	PRINT_EXEC(std::cout << typeid(decltype(matrix_ternary_test * 2.0f)).name() << std::endl);
-	PRINT_EXEC(std::cout << typeid(typename decltype(matrix_ternary_test * 2.0f)::value_type).name() << std::endl);
-	//PRINT_EXEC(std::cout << mat(matrix_ternary_test * 2.0f) << std::endl);
-	PRINT_EXEC(std::cout << mobj_static*2.0f);
+	PRINT_EXEC(print(clamp(vec({1, 2, 3}), 0, 2)));
+	PRINT_EXEC(std::cout << matrix_of_float_vectors);
+	PRINT_EXEC(std::cout << clamp(matrix_of_float_vectors, -1.0f, 1.0f));
+	PRINT_EXEC(std::cout << mat<vec_static_t<2, uint8_t>>(clamp(matrix_of_float_vectors, 0.0f, 1.0f) * 255.0f));
+	PRINT_EXEC(std::cout << matrix_int);
+	PRINT_EXEC(std::cout << ternary_operation(matrix_int, 10, 12345, [](const auto& a, auto b, auto c)->auto { return a > b? a : c; }));
 	std::cout << std::endl;
 	
 	std::cout << "## transformation matrices ##" << std::endl;
