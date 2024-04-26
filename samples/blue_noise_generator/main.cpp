@@ -24,34 +24,28 @@ T random_range(T range_from, T range_to) {
 int main() {
 	constexpr int matdim = 512;
 	using complex_value_type = double;
-	constexpr complex_value_type zero = complex_value_type{0};
-	constexpr complex_value_type one = complex_value_type{1};
+	constexpr auto zero = complex_value_type{0};
+	constexpr auto one = complex_value_type{1};
 	std::cout << "Generating DFT and iDFT matrices..." << std::endl;
     mat_dynamic_t<std::complex<complex_value_type>> mat_DFT = Maths::mat_DFT<matdim, complex_value_type>();
     mat_dynamic_t<std::complex<complex_value_type>> mat_iDFT = transpose_hermitian(mat_DFT);
 	std::cout << "Generating white noise matrix..." << std::endl;
-	mat_dynamic_t<std::complex<complex_value_type>> mat(matdim, matdim);
-	mat = unary_operation(mat, [](const auto& x)->auto { return random_range(zero, one); });
+	mat_dynamic_t<std::complex<complex_value_type>> mat = mat_procedural(
+		matdim, matdim,
+		[](auto, auto, auto, auto)->auto { return random_range(zero, one); }
+	);
 	std::cout << "Generating filter matrix..." << std::endl;
-	mat_dynamic_t<std::complex<complex_value_type>> mat_filter(matdim, matdim);
-	auto sqr = [](auto x) { return x*x; };
-	for(IndexType m = 0; m < matdim; ++m)
-		for(IndexType n = 0; n < matdim; ++n) {
-			mat_filter[m, n] = complex_value_type{1};
+	auto fftshift = [](auto x, auto w) { return w*eucmod(-x/w + decltype(x){0.5}, decltype(x){1}); };
+	mat_dynamic_t<std::complex<complex_value_type>> mat_filter = mat_procedural(
+		matdim, matdim,
+		[&fftshift](auto m, auto n, auto rows, auto columns) {
+			complex_value_type center_offset = matdim/2;
 			complex_value_type radius = matdim/4;
-			mat_filter[m, n] *= std::sqrt(
-				static_cast<complex_value_type>(sqr(static_cast<complex_value_type>(n)) + sqr(static_cast<complex_value_type>(m)))
-			) > radius? 1.0 : 0.0;
-			mat_filter[m, n] *= std::sqrt(
-				static_cast<complex_value_type>(sqr(static_cast<complex_value_type>(matdim - n)) + sqr(static_cast<complex_value_type>(m)))
-			) > radius? 1.0 : 0.0;
-			mat_filter[m, n] *= std::sqrt(
-				static_cast<complex_value_type>(sqr(static_cast<complex_value_type>(n)) + sqr(static_cast<complex_value_type>(matdim - m)))
-			) > radius? 1.0 : 0.0;
-			mat_filter[m, n] *= std::sqrt(
-				static_cast<complex_value_type>(sqr(static_cast<complex_value_type>(matdim - n)) + sqr(static_cast<complex_value_type>(matdim - m)))
-			) > radius? 1.0 : 0.0;
+			auto x = fftshift(static_cast<complex_value_type>(n), static_cast<complex_value_type>(matdim));
+			auto y = fftshift(static_cast<complex_value_type>(m), static_cast<complex_value_type>(matdim));
+			return norm_frobenius(vec_ref<complex_value_type>({x, y})-center_offset) > radius? 1.0 : 0.0;
 		}
+	);
 		
 	// since expression templates operate on the data in-place,
 	// it's important to take caution for cases where you assign

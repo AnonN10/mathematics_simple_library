@@ -798,6 +798,36 @@ namespace Maths {
 	template <typename ET>
 	using invoke_expression_template_result_t = decltype(invoke_expression_template_result<ET>());
 
+	template <ConceptExtent ExtR, ConceptExtent ExtC, typename ValueGenerator>
+	struct MatrixGenerator {
+    	ValueGenerator f;
+		ExtR rows;
+		ExtC columns;
+
+		using value_type = invoke_expression_template_result_t<decltype(f(0, 0, 0, 0))>;
+
+		constexpr MatrixGenerator(const ValueGenerator& f = {}, const ExtR& rows = {}, const ExtC& columns = {})
+			: f(f), rows(rows), columns(columns)
+		{}
+
+		constexpr auto operator[] (IndexType row, IndexType column) const {
+			return f(row, column, rows.get(), columns.get());
+		}
+
+		constexpr auto row_count() const { return rows; }
+		constexpr auto column_count() const { return columns; }
+	};
+
+	template <IndexType Rows, IndexType Columns, typename ValueGenerator>
+	constexpr auto mat_procedural(const ValueGenerator& op) {
+		return MatrixGenerator<StaticExtent<Rows>, StaticExtent<Columns>, ValueGenerator> { op };
+	}
+
+	template <typename ValueGenerator>
+	constexpr auto mat_procedural(IndexType rows, IndexType columns, const ValueGenerator& op) {
+		return MatrixGenerator<DynamicExtent, DynamicExtent, ValueGenerator> { op, rows, columns };
+	}
+
 	template <ConceptMatrix L, ConceptMatrix R>
 	//requires (std::same_as<typename L::value_type, typename R::value_type>)
 	struct AugmentedMatrix {
