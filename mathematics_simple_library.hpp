@@ -1529,7 +1529,7 @@ namespace Maths {
 		M matrix;
     	UnaryOperator op;
 
-		using value_type = M::value_type;
+		using value_type = invoke_expression_template_result_t<decltype(op(matrix[0,0]))>;
 
 		constexpr MatrixUnaryOperation(const M& m, const UnaryOperator& op = {})
 			: matrix(m), op(op)
@@ -1547,10 +1547,16 @@ namespace Maths {
 	constexpr auto operator- (const M& m) {
 		return MatrixUnaryOperation<M, std::negate<>> { m };
 	}
-
 	template <ConceptMatrixObject M>
-	constexpr auto operator- (const M& m) {
-		return MatrixUnaryOperation<decltype(m.ref()), std::negate<>> { m.ref() };
+	constexpr auto operator- (const M& m) { return -m.ref(); }
+
+	template <ConceptMatrix M, typename UnaryOperator>
+	constexpr auto unary_operation(const M& m, const UnaryOperator& op) {
+		return MatrixUnaryOperation<M, decltype(op)> { m, op };
+	}
+	template <ConceptMatrixObject M, typename UnaryOperator>
+	constexpr auto unary_operation(const M& m, const UnaryOperator& op) {
+		return unary_operation(m.ref(), op);
 	}
 
 	template <ConceptMatrix A, typename B, typename C, typename TernaryOperator>
@@ -1583,7 +1589,6 @@ namespace Maths {
 		};
 		return MatrixTernaryOperation<A, B, C, decltype(op)> { m, lower, upper, {} };
 	}
-
 	template <ConceptMatrixObject A, typename B, typename C>
 	constexpr auto clamp(const A& m, B lower, C upper) {
 		return clamp(m.ref(), lower, upper);
@@ -1593,7 +1598,6 @@ namespace Maths {
 	constexpr auto ternary_operation(const A& a, B b, C c, const TernaryOperator& op) {
 		return MatrixTernaryOperation<A, B, C, TernaryOperator> { a, b, c, op };
 	}
-
 	template <ConceptMatrixObject A, typename B, typename C, typename TernaryOperator>
 	constexpr auto ternary_operation(const A& a, B b, C c, const TernaryOperator& op) {
 		return MatrixTernaryOperation<decltype(a.ref()), B, C, TernaryOperator> { a.ref(), b, c, op };

@@ -30,15 +30,10 @@ int main() {
     mat_dynamic_t<std::complex<complex_value_type>> mat_DFT = Maths::mat_DFT<matdim, complex_value_type>();
     mat_dynamic_t<std::complex<complex_value_type>> mat_iDFT = transpose_hermitian(mat_DFT);
 	std::cout << "Generating white noise matrix..." << std::endl;
-	mat_dynamic_t<std::complex<complex_value_type>> mat;
-	mat.resize(matdim, matdim);
-	for(IndexType m = 0; m < matdim; ++m)
-		for(IndexType n = 0; n < matdim; ++n) {
-			mat[m, n] = random_range(zero, one);
-		}
+	mat_dynamic_t<std::complex<complex_value_type>> mat(matdim, matdim);
+	mat = unary_operation(mat, [](const auto& x)->auto { return random_range(zero, one); });
 	std::cout << "Generating filter matrix..." << std::endl;
-	mat_dynamic_t<std::complex<complex_value_type>> mat_filter;
-	mat_filter.resize(matdim, matdim);
+	mat_dynamic_t<std::complex<complex_value_type>> mat_filter(matdim, matdim);
 	auto sqr = [](auto x) { return x*x; };
 	for(IndexType m = 0; m < matdim; ++m)
 		for(IndexType n = 0; n < matdim; ++n) {
@@ -71,15 +66,9 @@ int main() {
 	mat = Maths::mat(mat_iDFT * mat) * transpose(mat_iDFT);
 	
 	std::cout << "Reading out the data..." << std::endl;
-    mat_dynamic_t<complex_value_type> mat_real;
-	mat_real.resize(matdim, matdim);
-	for(IndexType m = 0; m < matdim; ++m)
-		for(IndexType n = 0; n < matdim; ++n)
-			mat_real[m, n] = mat[m, n].real();
+    mat_dynamic_t<complex_value_type> mat_real = unary_operation(mat, [](const auto& x)->auto { return x.real(); });
 	std::cout << "Transforming to image space..." << std::endl;
-	auto mat_image_data = Maths::mat<uint8_t>(
-		clamp(normalize_minmax(mat_real), zero, one) * 255
-	);
+	auto mat_image_data = Maths::mat<uint8_t>(clamp(normalize_minmax(mat_real), zero, one) * 255);
 	
 	std::cout << "Saving to bluenoise.png..." << std::endl;
 	stbi_write_png("bluenoise.png", matdim, matdim, 1, mat_image_data.data.data(), 0);
