@@ -1514,6 +1514,15 @@ namespace Maths {
 	constexpr auto operator- (const L& l, const Field& r) {
 		return MatrixScalarBinaryOperation<decltype(l.ref()), Field, std::minus<>> { l.ref(), r };
 	}
+	
+	template <ConceptMatrix L, ConceptMatrix R>
+	constexpr auto& operator+= (L& l, const R& r) { l = l + r; return l; }
+	template <ConceptMatrix L, ConceptMatrix R>
+	constexpr auto& operator-= (L& l, const R& r) { l = l - r; return l; }
+	template <ConceptMatrix L, typename Field>
+	constexpr auto& operator+= (L& l, const Field& r) { l = l + r; return l; }
+	template <ConceptMatrix L, typename Field>
+	constexpr auto& operator-= (L& l, const Field& r) { l = l - r; return l; }
 
 	template <ConceptMatrix M, typename UnaryOperator>
 	struct MatrixUnaryOperation {
@@ -2119,10 +2128,13 @@ namespace Maths {
 		return VectorComponentWiseBinaryOperation<decltype(l.ref()), decltype(r.ref()), std::minus<>>{ l.ref(), r.ref() };
 	}
 	template <ConceptVector L, ConceptVector R>
-	constexpr auto& operator+= (L& l, const R& r) {
-		l = l + r;
-		return l;
-	}
+	constexpr auto& operator*= (L& l, const R& r) { l = l * r; return l; }
+	template <ConceptVector L, ConceptVector R>
+	constexpr auto& operator/= (L& l, const R& r) { l = l / r; return l; }
+	template <ConceptVector L, ConceptVector R>
+	constexpr auto& operator+= (L& l, const R& r) { l = l + r; return l; }
+	template <ConceptVector L, ConceptVector R>
+	constexpr auto& operator-= (L& l, const R& r) { l = l - r; return l; }
 
 	template <ConceptVector L, typename Field, typename BinaryOperator>
 	struct VectorScalarBinaryOperation {
@@ -2163,6 +2175,14 @@ namespace Maths {
 	constexpr auto operator- (const V& l, const Field& r) { return VectorScalarBinaryOperation<V, Field, std::minus<>>{ l, r }; }
 	template <ConceptVectorObject V, typename Field>
 	constexpr auto operator- (const V& l, const Field& r) { return l.ref() - r; }
+	template <ConceptVector L, typename Field>
+	constexpr auto& operator*= (L& l, const Field& r) { l = l * r; return l; }
+	template <ConceptVector L, typename Field>
+	constexpr auto& operator/= (L& l, const Field& r) { l = l / r; return l; }
+	template <ConceptVector L, typename Field>
+	constexpr auto& operator+= (L& l, const Field& r) { l = l + r; return l; }
+	template <ConceptVector L, typename Field>
+	constexpr auto& operator-= (L& l, const Field& r) { l = l - r; return l; }
 
 	template <ConceptVector V>
 	constexpr auto min(const V& v) {
