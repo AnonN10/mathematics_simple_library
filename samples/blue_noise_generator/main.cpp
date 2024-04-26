@@ -25,7 +25,7 @@ int main() {
 	constexpr int matdim = 512;
 	using complex_value_type = double;
 	constexpr complex_value_type zero = complex_value_type{0};
-	constexpr complex_value_type one = complex_value_type{0};
+	constexpr complex_value_type one = complex_value_type{1};
 	std::cout << "Generating DFT and iDFT matrices..." << std::endl;
     mat_dynamic_t<std::complex<complex_value_type>> mat_DFT = Maths::mat_DFT<matdim, complex_value_type>();
     mat_dynamic_t<std::complex<complex_value_type>> mat_iDFT = transpose_hermitian(mat_DFT);
