@@ -1687,6 +1687,17 @@ namespace Maths {
 	}
 
 	template <ConceptMatrix M>
+	constexpr auto trace(const M& m) {
+		assert_extent(m.row_count(), m.column_count(), std::equal_to<>{});
+		auto sum = m[0,0];
+		for(IndexType i = 1; i < m.row_count().get(); ++i)
+			sum += m[i, i];
+		return sum;
+	}
+	template <ConceptMatrix M>
+	constexpr auto tr(const M& m) { return trace(m); }
+
+	template <ConceptMatrix M>
 	constexpr auto min(const M& m) {
 		auto minimum = m[0,0];
 		for(IndexType row = 0; row < m.row_count().get(); ++row)
