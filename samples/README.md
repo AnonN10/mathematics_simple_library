@@ -28,11 +28,15 @@ solution:
 
 ## Blue noise generator
 
+Generates an image of spatial noise with removed low frequencies by employing technique known as circular convolution filtering via frequency domain product.
+
 Possible output of the program:
 
 ![Blue noise image](/samples/readme_images/bluenoise.png)
 
 ## Jump Flooding algorithm
+
+Constructs a Voronoi diagram and its distance field using a friendly for concurrent computation algorithm.
 
 Possible output of the program:
 
