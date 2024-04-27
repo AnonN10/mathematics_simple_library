@@ -30,12 +30,12 @@ solution:
 
 Possible output of the program:
 
-![Blue noise image](/readme_images/bluenoise.png)
+![Blue noise image](/samples/readme_images/bluenoise.png)
 
 ## Jump Flooding algorithm
 
 Possible output of the program:
 
-![Voronoi diagram](/readme_images/voronoi.png)
+![Voronoi diagram](/samples/readme_images/voronoi.png)
 
-![Distance field of the Voronoi diagram](/readme_images/distancefield.png)
+![Distance field of the Voronoi diagram](/samples/readme_images/distancefield.png)
