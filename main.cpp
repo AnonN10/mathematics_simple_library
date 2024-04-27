@@ -166,7 +166,7 @@ int main() {
 	PRINT_EXEC(print(m_translation));
 	PRINT_EXEC(mat_static_t<4,4,float> m_rotation = rotation(vec_ref<float>({1, 0, 0, 0}), vec_ref<float>({0, 1, 0, 0}), 3.14159265358979));
 	PRINT_EXEC(print(m_rotation));
-	PRINT_EXEC(mat_static_t<4,4,float> m_scaling = scaling(vec_ref<float>({2, 3, 4, 1})));
+	PRINT_EXEC(mat_static_t<4,4,float> m_scaling = scaling(vec_ref<float>({1, 2, 3, 1})));
 	PRINT_EXEC(print(m_scaling));
 	PRINT_EXEC(transform = m_translation * m_rotation * m_scaling);
 	PRINT_EXEC(print(transform));
@@ -175,6 +175,7 @@ int main() {
 	std::cout << std::endl;
 	
 	std::cout << "## function library ##" << std::endl;
+	PRINT_EXEC(std::cout << trace(transform) << std::endl);
 	PRINT_EXEC(std::cout << determinant(transform) << std::endl);
 	PRINT_EXEC(std::cout << determinant(mat_identity<4, 4>()) << std::endl);
 	PRINT_EXEC(std::cout << det(mobj_static) << std::endl);
