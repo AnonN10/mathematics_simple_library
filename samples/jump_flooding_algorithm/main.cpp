@@ -28,13 +28,11 @@ T random_range(T range_from, T range_to) {
     return distr(generator);
 }
 
-float distance_metric(float x, float y) {
-	//Euclidean distance
-	return std::sqrt(x*x+y*y);
-	//Chebyshev distance
-	//return std::max(std::abs(x), std::abs(y));
-	//Manhattan distance
-	//return std::abs(x)+std::abs(y);
+template<typename T>
+constexpr auto distance_metric(T x) {
+	return norm_euclidean(x);
+	//return norm_chebyshev(x);
+	//return norm_manhattan(x);
 }
 
 int main() {
@@ -42,34 +40,37 @@ int main() {
 		image_width = 1024,
 		image_height = 1024,
 		seed_count = 64;
+
 	using seed_type = std::tuple<
-		std::array<std::int32_t, 2>,//position (x, y), in image space [0; width)*[0; height)
-		std::array<float, 3>//color
+		vec_static_t<2, std::int32_t>,//position (x, y), in image space [0; width)*[0; height)
+		vec_static_t<3, float>//color
 	>;
+	std::array<seed_type, seed_count> seeds;
+	
 	using cell_type = std::tuple<
 		seed_type*,//assigned seed
 		float//distance to assigned seed, in normalized resolution space [0; width)*[0; height)/max(width, height)
 	>;
 	//a matrix to store the distance field and the closest seed at each cell
-	mat_dynamic_t<cell_type>/*Matrix<image_height, image_width, cell_type, true>*/ mat_image;
-	mat_image.resize(image_height, image_width);
-	std::array<seed_type, seed_count> seeds;
+	mat_dynamic_t<cell_type> mat_image(image_height, image_width);
+
+	//insert seeds into the image matrix at random positions
 	for(auto&& seed : seeds) {
-		auto position = std::array<std::int32_t, 2>({
-			random_range<std::int32_t>(0, image_width-1),
-			random_range<std::int32_t>(0, image_height-1),
+		auto position = vec({
+				random_range<std::int32_t>(0, image_width-1),
+				random_range<std::int32_t>(0, image_height-1),
 		});
 		seed = seed_type(
 			position,
-			{
+			vec_ref({
 				random_range<float>(0.0, 1.0),
 				random_range<float>(0.0, 1.0),
 				random_range<float>(0.0, 1.0),
-			}
+			})
 		);
 		//row index is y, column index is x - hence y, x
 		auto&& cell = mat_image[position[1], position[0]];
-		//insert seed into the cell
+		//insert the seed into the cell
 		std::get<0>(cell) = &seed;
 		std::get<1>(cell) = 0.0;
 	}
@@ -85,6 +86,7 @@ int main() {
 		for(IndexType m = 0; m < image_height; ++m)
 			for(IndexType n = 0; n < image_width; ++n) {
 				auto&& current_cell = mat_image[m, n];
+				vec_static_t<2, float> cell_pos = vec<float>(vec_ref({n, m}));
 				//for each 3x3 kernel sample
 				for(std::int32_t y = -1; y <= 1; ++y) {
 					for(std::int32_t x = -1; x <= 1; ++x) {
@@ -99,11 +101,8 @@ int main() {
 						auto sample_seed = std::get<0>(sample_cell);
 						if(sample_seed) {
 							//compute distance from current cell position to the sample's seed position in normalized resolution space
-							auto seed_pos = std::get<0>(*sample_seed);
-							float distance = distance_metric(
-								static_cast<float>(seed_pos[0]-static_cast<std::int32_t>(n))/static_cast<float>(max_dimension),
-								static_cast<float>(seed_pos[1]-static_cast<std::int32_t>(m))/static_cast<float>(max_dimension)
-							);
+							auto seed_pos = vec<float>(std::get<0>(*sample_seed));
+							float distance = distance_metric((seed_pos-cell_pos)/static_cast<float>(max_dimension));
 							auto min_distance = std::get<1>(current_cell);
 							//if distance is smaller or is currently empty
 							if(distance < min_distance || !std::get<0>(current_cell)) {
@@ -116,52 +115,25 @@ int main() {
 				}
 			}
 	}
-    
-    std::vector<std::tuple<std::uint8_t, std::uint8_t, std::uint8_t>> image_data_voronoi(image_width * image_height);
-    std::vector<std::uint8_t> image_data_distance_field(image_width * image_height);
 	
 	std::cout << "Transforming to image space..." << std::endl;
-    std::transform(
-		mat_image.data.begin(),
-		mat_image.data.end(),
-		image_data_voronoi.begin(),
-		[](auto in)->std::tuple<std::uint8_t, std::uint8_t, std::uint8_t> {
-			std::tuple<std::uint8_t, std::uint8_t, std::uint8_t> ret;
-			if(!std::get<0>(in)) return ret;
-			auto&& seed = *std::get<0>(in);
-			auto clamp_normalize = [](auto x)->std::uint8_t {
-				return static_cast<std::uint8_t>(
-					std::min(
-						std::max(x, static_cast<decltype(x)>(0)),
-						static_cast<decltype(x)>(1)
-					)*static_cast<decltype(x)>(255)
-				);
-			};
-			std::get<0>(ret) = clamp_normalize(std::get<1>(seed)[0]);
-			std::get<1>(ret) = clamp_normalize(std::get<1>(seed)[1]);
-			std::get<2>(ret) = clamp_normalize(std::get<1>(seed)[2]);
-			return ret;
+	auto mat_image_data_voronoi = mat<vec_static_t<3, std::uint8_t>>(mat(unary_operation(
+		mat_image,
+		[](const auto& in)->auto {
+			if(!std::get<0>(in)) return std::remove_reference_t<decltype(std::get<1>(*std::get<0>(in)))>{};
+			return std::get<1>(*std::get<0>(in));
 		}
-	);
-	std::transform(
-		mat_image.data.begin(),
-		mat_image.data.end(),
-		image_data_distance_field.begin(),
-		[](auto in)->std::uint8_t {
-			auto dist = std::get<1>(in);
-			return static_cast<std::uint8_t>(
-				std::min(
-					std::max(dist, static_cast<decltype(dist)>(0)),
-					static_cast<decltype(dist)>(1)
-				)*static_cast<decltype(dist)>(255));
-		}
-	);
+	))*255);
+	auto mat_image_data_distance_field = mat<std::uint8_t>((unary_operation(
+		mat_image,
+		[](const auto& in)->auto { return std::get<1>(in); }
+	))*255);
     
 	std::cout << "Saving to voronoi.png..." << std::endl;
-	stbi_write_png("voronoi.png", image_width, image_height, 3, image_data_voronoi.data(), 0);
+	stbi_write_png("voronoi.png", image_width, image_height, 3, mat_image_data_voronoi.data.data(), 0);
     
 	std::cout << "Saving to distancefield.png..." << std::endl;
-	stbi_write_png("distancefield.png", image_width, image_height, 1, image_data_distance_field.data(), 0);
+	stbi_write_png("distancefield.png", image_width, image_height, 1, mat_image_data_distance_field.data.data(), 0);
 
 	std::cout << "Done." << std::endl;
 	

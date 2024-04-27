@@ -185,7 +185,6 @@ int main() {
 	PRINT_EXEC(print(augment(mat_multiplicative_identity(4, 4), mat_hadamard_identity(4, 2))));
 	PRINT_EXEC(print(split_right(transform, 2)));
 	PRINT_EXEC(print(normalize(transform)));
-	PRINT_EXEC(print(normalize_min(transform+0.1)));
 	PRINT_EXEC(print(normalize_max(transform)));
 	PRINT_EXEC(print(normalize_minmax(transform)));
 	PRINT_EXEC(print(submatrix(transform, 0, 0)));
@@ -193,7 +192,6 @@ int main() {
 	PRINT_EXEC(print(cofactor(transform)));
 	PRINT_EXEC(print(gramian(transform)));
 	PRINT_EXEC(print(normalize(vec_ref({1,1,1}))));
-	PRINT_EXEC(print(normalize_min(vec_ref<float>({0.1,2,3}))));
 	PRINT_EXEC(print(normalize_max(vec_ref<float>({1,5,10}))));
 	PRINT_EXEC(print(normalize_minmax(vec_ref<float>({-10,5,10}))));
 	

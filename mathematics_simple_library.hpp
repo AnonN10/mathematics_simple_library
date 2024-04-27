@@ -389,8 +389,8 @@ namespace Maths {
 
 		template <ConceptVector V>
         VectorObjectDynamic& operator= (const V& v) {
-			data.resize(v.data.size());
-			std::copy(v.data.begin(), v.data.end(), data.begin());
+			resize(v.size().get());
+            ref() = v;
             return *this;
         }
 
@@ -1652,16 +1652,6 @@ namespace Maths {
 	}
 
 	template <ConceptMatrix M>
-	constexpr auto norm_min(const M& m) {
-		using std::abs;
-		auto norm = abs(m[0,0]);
-		for(IndexType row = 0; row < m.row_count().get(); ++row)
-			for(IndexType column = 0; column < m.column_count().get(); ++column)
-				if(norm > abs(m[row, column])) norm = abs(m[row, column]);
-        return norm;
-	}
-
-	template <ConceptMatrix M>
 	constexpr auto norm_max(const M& m) {
 		using std::abs;
 		auto norm = abs(m[0,0]);
@@ -1693,9 +1683,6 @@ namespace Maths {
 	constexpr auto normalize_euclidean(const M& m) { return normalize_frobenius(m); }
 	template <ConceptMatrix M>
 	constexpr auto normalize(const M& m) { return normalize_frobenius(m); }
-
-	template <ConceptMatrix M>
-	constexpr auto normalize_min(const M& m) { return m/typename M::value_type{norm_min(m)}; }
 
 	template <ConceptMatrix M>
 	constexpr auto normalize_max(const M& m) { return m/typename M::value_type{norm_max(m)}; }
@@ -2234,23 +2221,46 @@ namespace Maths {
         return maximum;
 	}
 
-	template <ConceptVector V>
-	constexpr auto norm_min(const V& v) {
+	template <ConceptVector V, typename Real>
+	constexpr auto norm_p(const V& v, Real p) {
 		using std::abs;
-		auto norm = abs(v[0]);
-		for(IndexType i = 0; i < v.size().get(); ++i)
-			if(norm > abs(v[i])) norm = abs(v[i]);
-        return norm;
+		auto sum = std::pow(abs(v[0]), p);
+		for(IndexType i = 1; i < v.size().get(); ++i)
+			sum += std::pow(abs(v[i]), p);
+        return std::pow(sum, Real{1}/p);
 	}
 
 	template <ConceptVector V>
-	constexpr auto norm_max(const V& v) {
+	constexpr auto norm_uniform(const V& v) {
 		using std::abs;
 		auto norm = abs(v[0]);
 		for(IndexType i = 0; i < v.size().get(); ++i)
 			if(norm < abs(v[i])) norm = abs(v[i]);
         return norm;
 	}
+	template <ConceptVector V>
+	constexpr auto norm_maximum(const V& v) { return norm_uniform(v); }
+	template <ConceptVector V>
+	constexpr auto norm_max(const V& v) { return norm_uniform(v); }
+	template <ConceptVector V>
+	constexpr auto norm_chebyshev(const V& v) { return norm_uniform(v); }
+	template <ConceptVector V>
+	constexpr auto norm_infinity(const V& v) { return norm_uniform(v); }
+	template <ConceptVector V>
+	constexpr auto norm_inf(const V& v) { return norm_uniform(v); }
+
+	template <ConceptVector V>
+	constexpr auto norm_taxicab(const V& v) {
+		using std::abs;
+		auto sum = static_cast<typename V::value_type>(0);
+		for(IndexType i = 0; i < v.size().get(); ++i)
+				sum += abs(v[i]);
+        return sum;
+	}
+	template <ConceptVector V>
+	constexpr auto norm_manhattan(const V& v) { return norm_taxicab(v); }
+	template <ConceptVector V>
+	constexpr auto norm_p1(const V& v) { return norm_taxicab(v); }
 
 	template <ConceptVector V>
 	constexpr auto norm_frobenius(const V& v) {
@@ -2265,21 +2275,40 @@ namespace Maths {
 	constexpr auto magnitude(const V& v) { return norm_frobenius(v); }
 	template <ConceptVector V>
 	constexpr auto length(const V& v) { return norm_frobenius(v); }
+	template <ConceptVector V>
+	constexpr auto norm_p2(const V& v) { return norm_frobenius(v); }
 
 	template <ConceptVector V>
-	constexpr auto normalize_frobenius(const V& v) {
-        return v/norm_frobenius(v);
-	}
+	constexpr auto normalize_uniform(const V& v) { return v/norm_max(v); }
+	template <ConceptVector V>
+	constexpr auto normalize_maximum(const V& v) { return normalize_uniform(v); }
+	template <ConceptVector V>
+	constexpr auto normalize_max(const V& v) { return normalize_uniform(v); }
+	template <ConceptVector V>
+	constexpr auto normalize_chebyshev(const V& v) { return normalize_uniform(v); }
+	template <ConceptVector V>
+	constexpr auto normalize_infinity(const V& v) { return normalize_uniform(v); }
+	template <ConceptVector V>
+	constexpr auto normalize_inf(const V& v) { return normalize_uniform(v); }
+
+	template <ConceptVector V>
+	constexpr auto normalize_taxicab(const V& v) { return v/norm_taxicab(v); }
+	template <ConceptVector V>
+	constexpr auto normalize_manhattan(const V& v) { return normalize_taxicab(v); }
+	template <ConceptVector V>
+	constexpr auto normalize_p1(const V& v) { return normalize_taxicab(v); }
+
+	template <ConceptVector V>
+	constexpr auto normalize_frobenius(const V& v) { return v/norm_frobenius(v); }
 	template <ConceptVector V>
 	constexpr auto normalize_euclidean(const V& v) { return normalize_frobenius(v); }
 	template <ConceptVector V>
+	constexpr auto normalize_p2(const V& v) { return normalize_uniform(v); }
+	template <ConceptVector V>
 	constexpr auto normalize(const V& v) { return normalize_frobenius(v); }
-
-	template <ConceptVector V>
-	constexpr auto normalize_min(const V& v) { return v/std::remove_reference_t<decltype(v[0])>{norm_min(v)}; }
-
-	template <ConceptVector V>
-	constexpr auto normalize_max(const V& v) { return v/std::remove_reference_t<decltype(v[0])>{norm_max(v)}; }
+	
+	template <ConceptVector V, typename Real>
+	constexpr auto normalize_p(const V& v, Real p) { return v/norm_p(v, p); }
 
 	template <ConceptVector V>
 	constexpr auto normalize_minmax(const V& v) {
