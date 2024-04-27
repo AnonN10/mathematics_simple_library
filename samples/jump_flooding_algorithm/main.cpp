@@ -93,10 +93,10 @@ int main() {
 						//ignore self
 						if(x==0 && y==0) continue;
 						//sample cell at iteration's offset y, x
-						IndexType
-							pos_x = eucmod(static_cast<std::int32_t>(n)+x*offset_scale, static_cast<std::int32_t>(image_width)),
-							pos_y = eucmod(static_cast<std::int32_t>(m)+y*offset_scale, static_cast<std::int32_t>(image_height));
-						auto&& sample_cell = mat_image[pos_y, pos_x];
+						auto&& sample_cell = mat_image[
+							circshift<std::int32_t>(n, x*offset_scale, image_width),
+							circshift<std::int32_t>(m, y*offset_scale, image_height)
+						];
 						//if sample is not empty
 						auto sample_seed = std::get<0>(sample_cell);
 						if(sample_seed) {

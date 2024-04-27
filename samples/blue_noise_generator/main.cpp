@@ -35,10 +35,9 @@ int main() {
 		[](auto, auto, auto, auto)->auto { return random_range(zero, one); }
 	);
 	std::cout << "Generating filter matrix..." << std::endl;
-	auto fftshift = [](auto x, auto w) { return w*eucmod(-x/w + decltype(x){0.5}, decltype(x){1}); };
 	mat_dynamic_t<std::complex<complex_value_type>> mat_filter = mat_procedural(
 		matdim, matdim,
-		[&fftshift](auto m, auto n, auto rows, auto columns) {
+		[](auto m, auto n, auto rows, auto columns) {
 			complex_value_type center_offset = matdim/2;
 			complex_value_type radius = matdim/4;
 			auto x = fftshift(static_cast<complex_value_type>(n), static_cast<complex_value_type>(matdim));

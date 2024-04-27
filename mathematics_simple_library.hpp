@@ -76,6 +76,19 @@ namespace Maths {
 	template <typename T>
 	constexpr T eucmod(T a, T b) { return euclidean_remainder(a, b); }
 
+	template <typename T>
+	constexpr T circular_shift(T x, T shift, T width) { return euclidean_modulo(x + shift, width); }
+	template <typename T>
+	constexpr T circshift(T x, T shift, T width) { return circular_shift(x, shift, width); }
+
+	template <typename T>
+	constexpr T fftshift(T x, T width) {
+		if constexpr(std::is_unsigned_v<T>)
+			return eucmod(width - eucmod(x, width) + width/static_cast<T>(2), width);
+		else
+			return circular_shift(-x, width/static_cast<T>(2), width);
+	}
+
 	template <typename T, typename U>
 	constexpr T linear_interpolation(T a, T b, U t) {
 		return a*(static_cast<U>(1) - t) + b*t;
@@ -828,10 +841,18 @@ namespace Maths {
 	constexpr auto mat_procedural(const ValueGenerator& op) {
 		return MatrixGenerator<StaticExtent<Rows>, StaticExtent<Columns>, ValueGenerator, ColumnMajor> { op };
 	}
+	template <IndexType Rows, IndexType Columns, bool ColumnMajor, typename ValueGenerator>
+	constexpr auto mat_procedural(const ValueGenerator& op) {
+		return mat_procedural<Rows, Columns, ValueGenerator, ColumnMajor>(op);
+	}
 
 	template <typename ValueGenerator, bool ColumnMajor = false>
 	constexpr auto mat_procedural(IndexType rows, IndexType columns, const ValueGenerator& op) {
 		return MatrixGenerator<DynamicExtent, DynamicExtent, ValueGenerator, ColumnMajor> { op, rows, columns };
+	}
+	template <bool ColumnMajor, typename ValueGenerator>
+	constexpr auto mat_procedural(IndexType rows, IndexType columns, const ValueGenerator& op) {
+		return mat_procedural<ValueGenerator, ColumnMajor>(rows, columns, op);
 	}
 
 	template <ConceptMatrix L, ConceptMatrix R>
@@ -1279,6 +1300,42 @@ namespace Maths {
 	template <IndexType Column, ConceptMatrix M>
 	constexpr auto column_of(const M& m) { return RowOf<M, StaticExtent<Column>> { transpose(m) }; }
 
+	template <ConceptMatrix M, typename UnaryOperator>
+	struct MatrixUnaryOperation {
+		M matrix;
+    	UnaryOperator op;
+
+		using value_type = invoke_expression_template_result_t<decltype(op(matrix[0,0]))>;
+		constexpr static bool column_major = M::column_major;
+
+		constexpr MatrixUnaryOperation(const M& m, const UnaryOperator& op = {})
+			: matrix(m), op(op)
+		{}
+
+		constexpr auto operator[] (IndexType row, IndexType column) const {
+			return op(matrix[row, column]);
+		}
+
+		constexpr auto row_count() const { return matrix.row_count(); }
+		constexpr auto column_count() const { return matrix.column_count(); }
+	};
+
+	template <ConceptMatrix M>
+	constexpr auto operator- (const M& m) {
+		return MatrixUnaryOperation<M, std::negate<>> { m };
+	}
+	template <ConceptMatrixObject M>
+	constexpr auto operator- (const M& m) { return -m.ref(); }
+
+	template <ConceptMatrix M, typename UnaryOperator>
+	constexpr auto unary_operation(const M& m, const UnaryOperator& op) {
+		return MatrixUnaryOperation<M, decltype(op)> { m, op };
+	}
+	template <ConceptMatrixObject M, typename UnaryOperator>
+	constexpr auto unary_operation(const M& m, const UnaryOperator& op) {
+		return unary_operation(m.ref(), op);
+	}
+
 	template <ConceptMatrix L, ConceptMatrix R>
 	struct KroneckerProduct {
 		L left;
@@ -1575,40 +1632,13 @@ namespace Maths {
 	template <ConceptMatrix L, typename Field>
 	constexpr auto& operator-= (L& l, const Field& r) { l = l - r; return l; }
 
-	template <ConceptMatrix M, typename UnaryOperator>
-	struct MatrixUnaryOperation {
-		M matrix;
-    	UnaryOperator op;
-
-		using value_type = invoke_expression_template_result_t<decltype(op(matrix[0,0]))>;
-		constexpr static bool column_major = M::column_major;
-
-		constexpr MatrixUnaryOperation(const M& m, const UnaryOperator& op = {})
-			: matrix(m), op(op)
-		{}
-
-		constexpr auto operator[] (IndexType row, IndexType column) const {
-			return op(matrix[row, column]);
-		}
-
-		constexpr auto row_count() const { return matrix.row_count(); }
-		constexpr auto column_count() const { return matrix.column_count(); }
-	};
-
-	template <ConceptMatrix M>
-	constexpr auto operator- (const M& m) {
-		return MatrixUnaryOperation<M, std::negate<>> { m };
+	template <ConceptMatrix A, typename B, typename BinaryOperator>
+	constexpr auto binary_operation(const A& m, const B& b, const BinaryOperator& op) {
+		return MatrixScalarBinaryOperation<A, B, decltype(op)> { m, b, op };
 	}
-	template <ConceptMatrixObject M>
-	constexpr auto operator- (const M& m) { return -m.ref(); }
-
-	template <ConceptMatrix M, typename UnaryOperator>
-	constexpr auto unary_operation(const M& m, const UnaryOperator& op) {
-		return MatrixUnaryOperation<M, decltype(op)> { m, op };
-	}
-	template <ConceptMatrixObject M, typename UnaryOperator>
-	constexpr auto unary_operation(const M& m, const UnaryOperator& op) {
-		return unary_operation(m.ref(), op);
+	template <ConceptMatrixObject A, typename B, typename BinaryOperator>
+	constexpr auto binary_operation(const A& m, const B& b, const BinaryOperator& op) {
+		return binary_operation(m.ref(), b, op);
 	}
 
 	template <ConceptMatrix A, typename B, typename C, typename TernaryOperator>
@@ -1634,8 +1664,8 @@ namespace Maths {
 	};
 
 	template <ConceptMatrix A, typename B, typename C>
-	constexpr auto clamp(const A& m, B lower, C upper) {
-		auto op = [](const auto& x, auto lower, auto upper)->auto {
+	constexpr auto clamp(const A& m, const B& lower, const C& upper) {
+		auto op = [](const auto& x, const auto& lower, const auto& upper)->auto {
 			using std::clamp;
 			using Maths::clamp;
 			return clamp(x, lower, upper);
@@ -1643,16 +1673,16 @@ namespace Maths {
 		return MatrixTernaryOperation<A, B, C, decltype(op)> { m, lower, upper, {} };
 	}
 	template <ConceptMatrixObject A, typename B, typename C>
-	constexpr auto clamp(const A& m, B lower, C upper) {
+	constexpr auto clamp(const A& m, const B& lower, const C& upper) {
 		return clamp(m.ref(), lower, upper);
 	}
 
 	template <ConceptMatrix A, typename B, typename C, typename TernaryOperator>
-	constexpr auto ternary_operation(const A& a, B b, C c, const TernaryOperator& op) {
+	constexpr auto ternary_operation(const A& a, const B& b, const C& c, const TernaryOperator& op) {
 		return MatrixTernaryOperation<A, B, C, TernaryOperator> { a, b, c, op };
 	}
 	template <ConceptMatrixObject A, typename B, typename C, typename TernaryOperator>
-	constexpr auto ternary_operation(const A& a, B b, C c, const TernaryOperator& op) {
+	constexpr auto ternary_operation(const A& a, const B& b, const C& c, const TernaryOperator& op) {
 		return MatrixTernaryOperation<decltype(a.ref()), B, C, TernaryOperator> { a.ref(), b, c, op };
 	}
 
@@ -2013,6 +2043,40 @@ namespace Maths {
 		return as_matrix<ColumnMajor>(vector.ref(), stride);
 	}
 
+	template <ConceptVector V, typename UnaryOperator>
+	struct VectorUnaryOperation {
+		V vector;
+    	UnaryOperator op;
+
+		using value_type = invoke_expression_template_result_t<decltype(op(vector[0]))>;
+
+		constexpr VectorUnaryOperation(const V& v, const UnaryOperator& op = {})
+			: vector(v), op(op)
+		{}
+
+		constexpr auto operator[] (IndexType element) const {
+			return op(vector[element]);
+		}
+
+		constexpr auto size() const { return vector.size(); }
+	};
+
+	template <ConceptVector V>
+	constexpr auto operator- (const V& v) {
+		return VectorUnaryOperation<V, std::negate<>> { v };
+	}
+	template <ConceptVectorObject V>
+	constexpr auto operator- (const V& v) { return -v.ref(); }
+
+	template <ConceptVector V, typename UnaryOperator>
+	constexpr auto unary_operation(const V& v, const UnaryOperator& op) {
+		return VectorUnaryOperation<V, decltype(op)> { v, op };
+	}
+	template <ConceptVectorObject V, typename UnaryOperator>
+	constexpr auto unary_operation(const V& v, const UnaryOperator& op) {
+		return unary_operation(v.ref(), op);
+	}
+
 	template <ConceptVector A, ConceptVector B>
 	constexpr auto inner_product(const A& a, const B& b) {
 		return (as_row(a) * as_column(b))[0, 0];
@@ -2021,41 +2085,6 @@ namespace Maths {
 	constexpr auto dot_product(const A& a, const B& b) { return inner_product(a, b); }
 	template <ConceptVector A, ConceptVector B>
 	constexpr auto dot(const A& a, const B& b) { return inner_product(a, b); }
-
-	template <ConceptVector A, typename B, typename C, typename TernaryOperator>
-	struct VectorTernaryOperation {
-		A vector;
-		B b;
-		C c;
-    	TernaryOperator op;
-
-		using value_type = invoke_expression_template_result_t<decltype(op(vector[0], b, c))>;
-
-		constexpr VectorTernaryOperation(const A& a, const B& b, const C& c, const TernaryOperator& op = {})
-			: vector(a), b(b), c(c), op(op)
-		{}
-
-		constexpr auto operator[] (IndexType element) const {
-			return op(vector[element], b, c);
-		}
-
-		constexpr auto size() const { return vector.size(); }
-	};
-
-	template <ConceptVector A, typename B, typename C>
-	constexpr auto clamp(const A& v, B lower, C upper) {
-		auto op = [](const auto& x, auto lower, auto upper)->auto {
-			using std::clamp;
-			using Maths::clamp;
-			return clamp(x, lower, upper);
-		};
-		return VectorTernaryOperation<A, B, C, decltype(op)> { v, lower, upper, {} };
-	}
-
-	template <ConceptVectorObject A, typename B, typename C>
-	constexpr auto clamp(const A& v, B lower, C upper) {
-		return clamp(v.ref(), lower, upper);
-	}
 
 	template <ConceptVector L, ConceptVector R, bool ColumnMajor>
 	struct OuterProduct {
@@ -2287,6 +2316,59 @@ namespace Maths {
 	constexpr auto& operator+= (L& l, const Field& r) { l = l + r; return l; }
 	template <ConceptVector L, typename Field>
 	constexpr auto& operator-= (L& l, const Field& r) { l = l - r; return l; }
+
+	template <ConceptVector A, typename B, typename BinaryOperator>
+	constexpr auto binary_operation(const A& v, const B& b, const BinaryOperator& op) {
+		return VectorScalarBinaryOperation<A, B, decltype(op)> { v, b, op };
+	}
+	template <ConceptVectorObject A, typename B, typename BinaryOperator>
+	constexpr auto binary_operation(const A& v, const B& b, const BinaryOperator& op) {
+		return binary_operation(v.ref(), b, op);
+	}
+
+	template <ConceptVector A, typename B, typename C, typename TernaryOperator>
+	struct VectorTernaryOperation {
+		A vector;
+		B b;
+		C c;
+    	TernaryOperator op;
+
+		using value_type = invoke_expression_template_result_t<decltype(op(vector[0], b, c))>;
+
+		constexpr VectorTernaryOperation(const A& a, const B& b, const C& c, const TernaryOperator& op = {})
+			: vector(a), b(b), c(c), op(op)
+		{}
+
+		constexpr auto operator[] (IndexType element) const {
+			return op(vector[element], b, c);
+		}
+
+		constexpr auto size() const { return vector.size(); }
+	};
+
+	template <ConceptVector A, typename B, typename C>
+	constexpr auto clamp(const A& v, const B& lower, const C& upper) {
+		auto op = [](const auto& x, const auto& lower, const auto& upper)->auto {
+			using std::clamp;
+			using Maths::clamp;
+			return clamp(x, lower, upper);
+		};
+		return VectorTernaryOperation<A, B, C, decltype(op)> { v, lower, upper, {} };
+	}
+
+	template <ConceptVectorObject A, typename B, typename C>
+	constexpr auto clamp(const A& v, const B& lower, const C& upper) {
+		return clamp(v.ref(), lower, upper);
+	}
+
+	template <ConceptVector A, typename B, typename C, typename TernaryOperator>
+	constexpr auto ternary_operation(const A& a, const B& b, const C& c, const TernaryOperator& op) {
+		return VectorTernaryOperation<A, B, C, TernaryOperator> { a, b, c, op };
+	}
+	template <ConceptVectorObject A, typename B, typename C, typename TernaryOperator>
+	constexpr auto ternary_operation(const A& a, const B& b, const C& c, const TernaryOperator& op) {
+		return VectorTernaryOperation<decltype(a.ref()), B, C, TernaryOperator> { a.ref(), b, c, op };
+	}
 
 	template <ConceptVector V>
 	constexpr auto min(const V& v) {

@@ -67,6 +67,7 @@ int main() {
 	PRINT_EXEC(print(mat_DFT(4)));
 	PRINT_EXEC(print(mat_walsh_sylvester<int>(8)));
 	PRINT_EXEC(print(mat_walsh_sylvester<8, int>()));
+	PRINT_EXEC(print(mat_procedural<4, 5>([](auto m, auto n, auto rows, auto columns)->int { return m*columns + n; })));
 	std::cout << std::endl;
 
 	std::cout << "## matrix reference (user-defined storage) ##" << std::endl;
@@ -108,7 +109,10 @@ int main() {
 	std::cout << std::endl;
 
 	std::cout << "## unary operators ##" << std::endl;
+	PRINT_EXEC(print(-(vec_ref({4, 5, 6}))));
 	PRINT_EXEC(print(-translation(vec_ref({4, 5, 6}))));
+	PRINT_EXEC(print(unary_operation(vec_ref({1, 2, 3, 4, 5}), [](auto x)->auto { return x*x; })));
+	PRINT_EXEC(print(unary_operation(-translation(vec_ref({4, 5, 6})), [](auto x)->auto { return x*x; })));
 	std::cout << std::endl;
 
 	std::cout << "## binary operators ##" << std::endl;
@@ -138,6 +142,7 @@ int main() {
 	PRINT_EXEC(print(kronecker_product(mat_kp_left, mat_kp_right)));
 	PRINT_EXEC(print(hadamard_product(mat({1, 2, 3, 4}, 2, 2), mat({2, 5, 10, 100}, 2, 2))));
 	PRINT_EXEC(std::cout << mat(matrix_of_vectors * matrix_of_vectors) << std::endl);
+	PRINT_EXEC(std::cout << binary_operation(matrix_of_vectors, vec_static_t<2, int>({1, 2}), [](auto a, auto b)->auto { return dot(a, b); }) << std::endl);
 	std::cout << std::endl;
 
 	std::cout << "## ternary operators ##" << std::endl;
