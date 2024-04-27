@@ -1,5 +1,5 @@
 build/*
 *.bmp
 *.png
-!/samples/*.png
+!samples/*/*.png
 settings.json
