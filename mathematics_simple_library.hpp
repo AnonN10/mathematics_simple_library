@@ -227,6 +227,7 @@ namespace Maths {
 	template <typename M>
 	concept ConceptMatrix = requires(const M& matrix, IndexType row, IndexType column) {
 		typename M::value_type;
+		{ M::column_major } -> std::same_as<const bool&>;
 		{ matrix[row, column] };
 		{ matrix.row_count() } -> ConceptExtent;
 		{ matrix.column_count() } -> ConceptExtent;
@@ -457,12 +458,13 @@ namespace Maths {
 		Hadamard
 	};
 
-	template <typename Field, ConceptExtent ExtR, ConceptExtent ExtC, MatrixIdentityType Type>
+	template <typename Field, ConceptExtent ExtR, ConceptExtent ExtC, MatrixIdentityType Type, bool ColumnMajor>
 	struct MatrixIdentity {
 		ExtR rows;
 		ExtC columns;
 
 		using value_type = Field;
+		constexpr static bool column_major = ColumnMajor;
 
 		constexpr MatrixIdentity(const ExtR& rows = {}, const ExtC& columns = {})
 			: rows(rows), columns(columns)
@@ -482,55 +484,55 @@ namespace Maths {
 		constexpr auto column_count() const { return columns; }
 	};
 
-	template <IndexType Rows, IndexType Columns, typename T = float>
+	template <IndexType Rows, IndexType Columns, typename T = float, bool ColumnMajor = false>
 	constexpr auto mat_additive_identity() {
-		return MatrixIdentity<T, StaticExtent<Rows>, StaticExtent<Columns>, MatrixIdentityType::Additive> { {}, {} };
+		return MatrixIdentity<T, StaticExtent<Rows>, StaticExtent<Columns>, MatrixIdentityType::Additive, ColumnMajor> { {}, {} };
 	}
-	template <typename T = float>
+	template <typename T = float, bool ColumnMajor = false>
 	constexpr auto mat_additive_identity(IndexType rows, IndexType columns) {
-		return MatrixIdentity<T, DynamicExtent, DynamicExtent, MatrixIdentityType::Additive> { rows, columns };
+		return MatrixIdentity<T, DynamicExtent, DynamicExtent, MatrixIdentityType::Additive, ColumnMajor> { rows, columns };
 	}
-	template <IndexType Rows, IndexType Columns, typename T = float>
+	template <IndexType Rows, IndexType Columns, typename T = float, bool ColumnMajor = false>
 	constexpr auto mat_zero() {
-		return mat_additive_identity<Rows, Columns, T>();
+		return mat_additive_identity<Rows, Columns, T, ColumnMajor>();
 	}
-	template <typename T = float>
+	template <typename T = float, bool ColumnMajor = false>
 	constexpr auto mat_zero(IndexType rows, IndexType columns) {
-		return mat_additive_identity<T>(rows, columns);
+		return mat_additive_identity<T, ColumnMajor>(rows, columns);
 	}
 
-	template <IndexType Rows, IndexType Columns, typename T = float>
+	template <IndexType Rows, IndexType Columns, typename T = float, bool ColumnMajor = false>
 	constexpr auto mat_multiplicative_identity() {
-		return MatrixIdentity<T, StaticExtent<Rows>, StaticExtent<Columns>, MatrixIdentityType::Multiplicative> { {}, {} };
+		return MatrixIdentity<T, StaticExtent<Rows>, StaticExtent<Columns>, MatrixIdentityType::Multiplicative, ColumnMajor> { {}, {} };
 	}
-	template <typename T = float>
+	template <typename T = float, bool ColumnMajor = false>
 	constexpr auto mat_multiplicative_identity(IndexType rows, IndexType columns) {
-		return MatrixIdentity<T, DynamicExtent, DynamicExtent, MatrixIdentityType::Multiplicative> { rows, columns };
+		return MatrixIdentity<T, DynamicExtent, DynamicExtent, MatrixIdentityType::Multiplicative, ColumnMajor> { rows, columns };
 	}
-	template <IndexType Rows, IndexType Columns, typename T = float>
+	template <IndexType Rows, IndexType Columns, typename T = float, bool ColumnMajor = false>
 	constexpr auto mat_identity() {
-		return mat_multiplicative_identity<Rows, Columns, T>();
+		return mat_multiplicative_identity<Rows, Columns, T, ColumnMajor>();
 	}
-	template <typename T = float>
+	template <typename T = float, bool ColumnMajor = false>
 	constexpr auto mat_identity(IndexType rows, IndexType columns) {
-		return mat_multiplicative_identity<T>(rows, columns);
+		return mat_multiplicative_identity<T, ColumnMajor>(rows, columns);
 	}
 
-	template <IndexType Rows, IndexType Columns, typename T = float>
+	template <IndexType Rows, IndexType Columns, typename T = float, bool ColumnMajor = false>
 	constexpr auto mat_hadamard_identity() {
-		return MatrixIdentity<T, StaticExtent<Rows>, StaticExtent<Columns>, MatrixIdentityType::Hadamard> { {}, {} };
+		return MatrixIdentity<T, StaticExtent<Rows>, StaticExtent<Columns>, MatrixIdentityType::Hadamard, ColumnMajor> { {}, {} };
 	}
-	template <typename T = float>
+	template <typename T = float, bool ColumnMajor = false>
 	constexpr auto mat_hadamard_identity(IndexType rows, IndexType columns) {
-		return MatrixIdentity<T, DynamicExtent, DynamicExtent, MatrixIdentityType::Hadamard> { rows, columns };
+		return MatrixIdentity<T, DynamicExtent, DynamicExtent, MatrixIdentityType::Hadamard, ColumnMajor> { rows, columns };
 	}
-	template <IndexType Rows, IndexType Columns, typename T = float>
+	template <IndexType Rows, IndexType Columns, typename T = float, bool ColumnMajor = false>
 	constexpr auto mat_one() {
-		return mat_hadamard_identity<Rows, Columns, T>();
+		return mat_hadamard_identity<Rows, Columns, T, ColumnMajor>();
 	}
-	template <typename T = float>
+	template <typename T = float, bool ColumnMajor = false>
 	constexpr auto mat_one(IndexType rows, IndexType columns) {
-		return mat_hadamard_identity<T>(rows, columns);
+		return mat_hadamard_identity<T, ColumnMajor>(rows, columns);
 	}
 
 	template <typename Field, ConceptExtent ExtR, ConceptExtent ExtC, bool ColumnMajor>
@@ -540,6 +542,7 @@ namespace Maths {
 		ExtC columns;
 
 		using value_type = Field;
+		constexpr static bool column_major = ColumnMajor;
 
 		constexpr MatrixReference(Field* base_ptr, const ExtR& rows = {}, const ExtC& columns = {})
 			: base_ptr(base_ptr), rows(rows), columns(columns)
@@ -632,6 +635,7 @@ namespace Maths {
         std::array<T, Rows * Columns> data;
 
 		using value_type = T;
+		constexpr static bool column_major = ColumnMajor;
 
         MatrixObjectStatic() = default;
         MatrixObjectStatic(const MatrixObjectStatic&) = default;
@@ -664,6 +668,7 @@ namespace Maths {
         IndexType columns;
 
 		using value_type = T;
+		constexpr static bool column_major = ColumnMajor;
 
         MatrixObjectDynamic()
             : MatrixObjectDynamic(0, 0)
@@ -745,24 +750,24 @@ namespace Maths {
 		return MatrixObjectDynamic<T, ColumnMajor> { container, rows, columns };
 	}
 
-	template <ConceptMatrixStatic M, bool ColumnMajor = false>
+	template <ConceptMatrixStatic M, bool ColumnMajor = M::column_major>
 	inline auto mat(const M& m) {
 		return MatrixObjectStatic<std::remove_const_t<typename M::value_type>, row_count_static<M>(), column_count_static<M>(), ColumnMajor> { m };
 	}
 
-	template <ConceptMatrix M, bool ColumnMajor = false>
+	template <ConceptMatrix M, bool ColumnMajor = M::column_major>
 	inline auto mat(const M& m) {
 		return MatrixObjectDynamic<typename M::value_type, ColumnMajor> { m };
 	}
 
-	template <typename T, ConceptMatrixStatic M, bool ColumnMajor = false>
+	template <typename T, ConceptMatrixStatic M>
 	inline auto mat(const M& m) {
-		return MatrixObjectStatic<T, row_count_static<M>(), column_count_static<M>(), ColumnMajor> { m };
+		return MatrixObjectStatic<T, row_count_static<M>(), column_count_static<M>(), M::column_major> { m };
 	}
 
-	template <typename T, ConceptMatrix M, bool ColumnMajor = false>
+	template <typename T, ConceptMatrix M>
 	inline auto mat(const M& m) {
-		return MatrixObjectDynamic<T, ColumnMajor> { m };
+		return MatrixObjectDynamic<T, M::column_major> { m };
 	}
 
 	template <typename T, bool ColumnMajor, ConceptMatrixStatic M>
@@ -798,13 +803,14 @@ namespace Maths {
 	template <typename ET>
 	using invoke_expression_template_result_t = decltype(invoke_expression_template_result<ET>());
 
-	template <ConceptExtent ExtR, ConceptExtent ExtC, typename ValueGenerator>
+	template <ConceptExtent ExtR, ConceptExtent ExtC, typename ValueGenerator, bool ColumnMajor>
 	struct MatrixGenerator {
     	ValueGenerator f;
 		ExtR rows;
 		ExtC columns;
 
 		using value_type = invoke_expression_template_result_t<decltype(f(0, 0, 0, 0))>;
+		constexpr static bool column_major = ColumnMajor;
 
 		constexpr MatrixGenerator(const ValueGenerator& f = {}, const ExtR& rows = {}, const ExtC& columns = {})
 			: f(f), rows(rows), columns(columns)
@@ -818,14 +824,14 @@ namespace Maths {
 		constexpr auto column_count() const { return columns; }
 	};
 
-	template <IndexType Rows, IndexType Columns, typename ValueGenerator>
+	template <IndexType Rows, IndexType Columns, typename ValueGenerator, bool ColumnMajor = false>
 	constexpr auto mat_procedural(const ValueGenerator& op) {
-		return MatrixGenerator<StaticExtent<Rows>, StaticExtent<Columns>, ValueGenerator> { op };
+		return MatrixGenerator<StaticExtent<Rows>, StaticExtent<Columns>, ValueGenerator, ColumnMajor> { op };
 	}
 
-	template <typename ValueGenerator>
+	template <typename ValueGenerator, bool ColumnMajor = false>
 	constexpr auto mat_procedural(IndexType rows, IndexType columns, const ValueGenerator& op) {
-		return MatrixGenerator<DynamicExtent, DynamicExtent, ValueGenerator> { op, rows, columns };
+		return MatrixGenerator<DynamicExtent, DynamicExtent, ValueGenerator, ColumnMajor> { op, rows, columns };
 	}
 
 	template <ConceptMatrix L, ConceptMatrix R>
@@ -833,6 +839,8 @@ namespace Maths {
 	struct AugmentedMatrix {
 		L left;
 		R right;
+
+		constexpr static bool column_major = L::column_major;
 
 		constexpr AugmentedMatrix(const L& l, const R& r) : left(l), right(r) {
 			assert_extent(left.row_count(), right.row_count(), std::equal_to<>{});
@@ -873,6 +881,7 @@ namespace Maths {
 		E split_bound;
 
 		using value_type = M::value_type;
+		constexpr static bool column_major = M::column_major;
 
 		constexpr SplitMatrix(const M& m, const E& split_bound = {}) : matrix(m), split_bound(split_bound) {
 			if constexpr (Vertical) {
@@ -965,6 +974,8 @@ namespace Maths {
 		//using value_type = std::remove_reference_t<decltype(std::declval<M>()[0,0])>;
 		mat_dynamic_t<value_type> matrix;
 
+		constexpr static bool column_major = M::column_major;
+
 		ReducedRowEchelonMatrix(const M& m) : matrix(m.row_count().get(), m.column_count().get()) {
 			matrix = m;
 
@@ -1009,6 +1020,7 @@ namespace Maths {
 		M matrix;
 
 		using value_type = M::value_type;
+		constexpr static bool column_major = M::column_major;
 
 		constexpr auto operator[] (IndexType row, IndexType column) const {
 			using value_type = std::remove_reference_t<decltype(matrix[0,0])>;
@@ -1033,6 +1045,7 @@ namespace Maths {
 		M matrix;
 
 		using value_type = M::value_type;
+		constexpr static bool column_major = M::column_major;
 
 		constexpr auto operator[] (IndexType row, IndexType column) const { return matrix[column, row]; }
 		constexpr auto row_count() const { return matrix.column_count(); }
@@ -1054,6 +1067,7 @@ namespace Maths {
 		ErasedColumn erased_column;
 
 		using value_type = M::value_type;
+		constexpr static bool column_major = M::column_major;
 
 		constexpr Submatrix(const M& matrix, const ErasedRow& erased_row = {}, const ErasedColumn& erased_column = {})
 			: matrix(matrix), erased_row(erased_row), erased_column(erased_column)
@@ -1083,6 +1097,7 @@ namespace Maths {
 		std::vector<IndexType> erased_columns;
 
 		using value_type = M::value_type;
+		constexpr static bool column_major = M::column_major;
 
 		SubmatrixDynamic(const M& matrix, IndexType erased_row, IndexType erased_column) : matrix(matrix)
 		{
@@ -1199,6 +1214,7 @@ namespace Maths {
 		M matrix;
 
 		using value_type = M::value_type;
+		constexpr static bool column_major = M::column_major;
 
 		constexpr auto operator[] (IndexType row, IndexType column) const {
 			using value_type = std::remove_reference_t<decltype(matrix[0,0])>;
@@ -1234,6 +1250,7 @@ namespace Maths {
 		E row;
 
 		using value_type = M::value_type;
+		constexpr static bool column_major = M::column_major;
 
 		constexpr RowOf(const M& matrix, const E& row = {}) : matrix(matrix), row(row) {
 			assert_extent(row, matrix.row_count(), std::less<>{});
@@ -1268,6 +1285,7 @@ namespace Maths {
 		R right;
 
 		using value_type = invoke_expression_template_result_t<decltype(left[0,0] * right[0,0])>;
+		constexpr static bool column_major = L::column_major;
 
 		constexpr KroneckerProduct(const L& l, const R& r)
 			: left(l), right(r)
@@ -1313,6 +1331,7 @@ namespace Maths {
 		R right;
 
 		using value_type = invoke_expression_template_result_t<decltype(left[0,0]*right[0,0]+left[0,0]*right[0,0])>;
+		constexpr static bool column_major = L::column_major;
 
 		constexpr MatrixMultiplication(const L& l, const R& r) : left(l), right(r) {
 			assert_extent(left.column_count(), right.row_count(), std::equal_to<>{});
@@ -1381,6 +1400,7 @@ namespace Maths {
     	BinaryOperator op;
 
 		using value_type = invoke_expression_template_result_t<decltype(op(left[0,0], right[0,0]))>;
+		constexpr static bool column_major = L::column_major;
 
 		constexpr MatrixComponentWiseBinaryOperation(const L& l, const R& r, const BinaryOperator& op = {})
 			: left(l), right(r), op(op)
@@ -1484,6 +1504,7 @@ namespace Maths {
     	BinaryOperator op;
 
 		using value_type = invoke_expression_template_result_t<decltype(op(left[0,0], right))>;
+		constexpr static bool column_major = L::column_major;
 
 		constexpr MatrixScalarBinaryOperation(const L& l, const Field& r, const BinaryOperator& op = {})
 			: left(l), right(r), op(op)
@@ -1560,6 +1581,7 @@ namespace Maths {
     	UnaryOperator op;
 
 		using value_type = invoke_expression_template_result_t<decltype(op(matrix[0,0]))>;
+		constexpr static bool column_major = M::column_major;
 
 		constexpr MatrixUnaryOperation(const M& m, const UnaryOperator& op = {})
 			: matrix(m), op(op)
@@ -1597,6 +1619,7 @@ namespace Maths {
     	TernaryOperator op;
 
 		using value_type = invoke_expression_template_result_t<decltype(op(matrix[0,0], b, c))>;
+		constexpr static bool column_major = A::column_major;
 
 		constexpr MatrixTernaryOperation(const A& a, const B& b, const C& c, const TernaryOperator& op = {})
 			: matrix(a), b(b), c(c), op(op)
@@ -1694,9 +1717,10 @@ namespace Maths {
 		return (m - minimum)/(maximum - minimum);
 	}
 
-	template <typename T, ConceptExtent ExtD>
+	template <typename T, ConceptExtent ExtD, bool ColumnMajor>
 	struct DiscreteFourierTransformMatrix {
 		using value_type = std::complex<T>;
+		constexpr static bool column_major = ColumnMajor;
 
 		ExtD dimension;
 		value_type omega;
@@ -1720,64 +1744,65 @@ namespace Maths {
 		constexpr auto column_count() const { return dimension; }
 	};
 
-	template <IndexType Dimension, typename T = float>
+	template <IndexType Dimension, typename T = float, bool ColumnMajor = false>
 	constexpr auto mat_DFT() {
-		return DiscreteFourierTransformMatrix<T, StaticExtent<Dimension>> {};
+		return DiscreteFourierTransformMatrix<T, StaticExtent<Dimension>, ColumnMajor> {};
 	}
-	template <typename T = float>
+	template <typename T = float, bool ColumnMajor = false>
 	constexpr auto mat_DFT(IndexType dimension) {
-		return DiscreteFourierTransformMatrix<T, DynamicExtent> { dimension };
+		return DiscreteFourierTransformMatrix<T, DynamicExtent, ColumnMajor> { dimension };
 	}
 
-	template <ConceptExtent Dimension, typename T = float>
+	template <ConceptExtent Dimension, typename T = float, bool ColumnMajor = false>
 	constexpr auto mat_walsh_sylvester([[maybe_unused]]IndexType dimension) {
 		if constexpr (Dimension::is_static()) {
 			if constexpr (Dimension::get() == 1) {
 				//Hadamard matrix of order 1
-				return mat<1, 1, T>({1});
+				return mat<1, 1, T, ColumnMajor>({1});
 			} else if constexpr (Dimension::get() == 2) {
 				//Hadamard matrix of order 2
-				return mat<2, 2, T>({
+				return mat<2, 2, T, ColumnMajor>({
 					1,  1,
 					1, -1,
 				});
 			} else {
 				//Hadamard matrix of order N
-				auto H_2 = mat_walsh_sylvester<StaticExtent<2>, T>(0);
-				auto H_n = mat_walsh_sylvester<StaticExtent<Dimension::get()/2>, T>(0);
+				auto H_2 = mat_walsh_sylvester<StaticExtent<2>, T, ColumnMajor>(0);
+				auto H_n = mat_walsh_sylvester<StaticExtent<Dimension::get()/2>, T, ColumnMajor>(0);
 				return mat(kronecker_product(H_2, H_n));
 			}
 		} else {
 			if (dimension==1) {
-				return mat<T>({1}, 1, 1);
+				return mat<T, ColumnMajor>({1}, 1, 1);
 			} else if (dimension==2) {
-				return mat<T>({ 1,  1, 1, -1, }, 2, 2);
+				return mat<T, ColumnMajor>({ 1,  1, 1, -1, }, 2, 2);
 			} else {
-				auto H_2 = mat_walsh_sylvester<DynamicExtent, T>(2);
-				auto H_n = mat_walsh_sylvester<DynamicExtent, T>(dimension/2);
-				mat_dynamic_t<T> ret = kronecker_product(H_2, H_n);
+				auto H_2 = mat_walsh_sylvester<DynamicExtent, T, ColumnMajor>(2);
+				auto H_n = mat_walsh_sylvester<DynamicExtent, T, ColumnMajor>(dimension/2);
+				mat_dynamic_t<T, ColumnMajor> ret = kronecker_product(H_2, H_n);
 				return ret;
 			}
 		}
 	}
 
-	template <IndexType Dimension, typename T = float>
+	template <IndexType Dimension, typename T = float, bool ColumnMajor = false>
 	constexpr auto mat_walsh_sylvester() {
 		static_assert(is_power_of_two(Dimension));
-		return mat_walsh_sylvester<StaticExtent<Dimension>, T>(0);
+		return mat_walsh_sylvester<StaticExtent<Dimension>, T, ColumnMajor>(0);
 	}
 
-	template <typename T = float>
+	template <typename T = float, bool ColumnMajor = false>
 	inline auto mat_walsh_sylvester(IndexType dimension) {
 		assert(is_power_of_two(dimension));
-		return mat_walsh_sylvester<DynamicExtent, T>(dimension);
+		return mat_walsh_sylvester<DynamicExtent, T, ColumnMajor>(dimension);
 	}
 
-	template <ConceptVector V>
+	template <ConceptVector V, bool ColumnMajor>
 	struct MatrixScaling {
 		V coefficients;
 
 		using value_type = V::value_type;
+		constexpr static bool column_major = ColumnMajor;
 
 		constexpr MatrixScaling(const V& coeffs) : coefficients(coeffs) {}
 
@@ -1791,14 +1816,17 @@ namespace Maths {
 		constexpr auto column_count() const { return coefficients.size(); }
 	};
 
-	template <ConceptVector V>
-	constexpr auto scaling(const V& coefficients) { return MatrixScaling<V> { coefficients }; }
+	template <ConceptVector V, bool ColumnMajor = false>
+	constexpr auto scaling(const V& coefficients) { return MatrixScaling<V, ColumnMajor> { coefficients }; }
+	template <bool ColumnMajor, ConceptVector V>
+	constexpr auto scaling(const V& coefficients) { return scaling<V, ColumnMajor>(coefficients); }
 
-	template <ConceptVector V>
+	template <ConceptVector V, bool ColumnMajor>
 	struct MatrixTranslation {
 		V coefficients;
 
 		using value_type = V::value_type;
+		constexpr static bool column_major = ColumnMajor;
 
 		constexpr MatrixTranslation(const V& coeffs) : coefficients(coeffs) {}
 
@@ -1812,16 +1840,19 @@ namespace Maths {
 		constexpr auto column_count() const { return coefficients.size()+1; }
 	};
 
-	template <ConceptVector V>
-	constexpr auto translation(const V& coefficients) { return MatrixTranslation<V> { coefficients }; }
+	template <ConceptVector V, bool ColumnMajor = false>
+	constexpr auto translation(const V& coefficients) { return MatrixTranslation<V, ColumnMajor> { coefficients }; }
+	template <bool ColumnMajor, ConceptVector V>
+	constexpr auto translation(const V& coefficients) { return translation<V, ColumnMajor>(coefficients); }
 
-	template <typename Field, ConceptVector U, ConceptVector V>
+	template <typename Field, ConceptVector U, ConceptVector V, bool ColumnMajor>
 	struct MatrixRotation {
 		U basis_u;
 		V basis_v;
 		Field theta;
 
 		using value_type = V::value_type;
+		constexpr static bool column_major = ColumnMajor;
 
 		MatrixRotation(const V& basis_u, const V& basis_v, Field theta)
 			: basis_u(basis_u), basis_v(basis_v), theta(theta)
@@ -1843,16 +1874,21 @@ namespace Maths {
 		auto column_count() const { return basis_u.size(); }
 	};
 
-	template <typename Field, ConceptVector U, ConceptVector V>
+	template <typename Field, ConceptVector U, ConceptVector V, bool ColumnMajor = false>
 	inline auto rotation(const U& basis_u, const V& basis_v, Field theta) {
-		return MatrixRotation<Field, U, V> { basis_u, basis_v, theta };
+		return MatrixRotation<Field, U, V, ColumnMajor> { basis_u, basis_v, theta };
+	}
+	template <bool ColumnMajor, typename Field, ConceptVector U, ConceptVector V>
+	inline auto rotation(const U& basis_u, const V& basis_v, Field theta) {
+		return rotation<Field, U, V, ColumnMajor>(basis_u, basis_v, theta);
 	}
 
-	template <ConceptVector V>
+	template <ConceptVector V, bool ColumnMajor>
 	struct AsRowVector {
 		V vector;
 
 		using value_type = V::value_type;
+		constexpr static bool column_major = ColumnMajor;
 
 		constexpr auto operator[] (IndexType row, IndexType column) const {
 			assert(row == 0);
@@ -1863,21 +1899,30 @@ namespace Maths {
 		constexpr auto column_count() const { return vector.size(); }
 	};
 
-	template <ConceptVector V>
+	template <ConceptVector V, bool ColumnMajor = false>
 	constexpr auto as_row(const V& vector) {
-		return AsRowVector<V>{ vector };
+		return AsRowVector<V, ColumnMajor>{ vector };
+	}
+	template <bool ColumnMajor, ConceptVector V>
+	constexpr auto as_row(const V& vector) {
+		return AsRowVector<V, ColumnMajor>{ vector };
 	}
 
-	template <ConceptVectorObject V>
+	template <ConceptVectorObject V, bool ColumnMajor = false>
 	constexpr auto as_row(const V& vector) {
-		return AsRowVector<decltype(vector.ref())>{ vector.ref() };
+		return as_row<ColumnMajor>(vector.ref());
+	}
+	template <bool ColumnMajor, ConceptVectorObject V>
+	constexpr auto as_row(const V& vector) {
+		return as_row<ColumnMajor>(vector.ref());
 	}
 
-	template <ConceptVector V>
+	template <ConceptVector V, bool ColumnMajor>
 	struct AsColumnVector {
 		V vector;
 
 		using value_type = V::value_type;
+		constexpr static bool column_major = ColumnMajor;
 
 		constexpr auto operator[] (IndexType row, IndexType column) const {
 			assert(column == 0);
@@ -1888,22 +1933,31 @@ namespace Maths {
 		constexpr auto column_count() const { return StaticExtent<1>(); }
 	};
 
-	template <ConceptVector V>
+	template <ConceptVector V, bool ColumnMajor = false>
 	constexpr auto as_column(const V& vector) {
-		return AsColumnVector<V>{ vector };
+		return AsColumnVector<V, ColumnMajor>{ vector };
+	}
+	template <bool ColumnMajor, ConceptVector V>
+	constexpr auto as_column(const V& vector) {
+		return AsColumnVector<V, ColumnMajor>{ vector };
 	}
 
-	template <ConceptVectorObject V>
+	template <ConceptVectorObject V, bool ColumnMajor = false>
 	constexpr auto as_column(const V& vector) {
-		return AsColumnVector<decltype(vector.ref())>{ vector.ref() };
+		return as_column<ColumnMajor>(vector.ref());
+	}
+	template <bool ColumnMajor, ConceptVectorObject V>
+	constexpr auto as_column(const V& vector) {
+		return as_column<ColumnMajor>(vector.ref());
 	}
 
-	template <ConceptVector V, ConceptExtent E, bool ColumnMajor = false>
+	template <ConceptVector V, ConceptExtent E, bool ColumnMajor>
 	struct VectorAsMatrix {
 		V vector;
 		E stride;
 
 		using value_type = V::value_type;
+		constexpr static bool column_major = ColumnMajor;
 
 		constexpr auto operator[] (IndexType row, IndexType column) const {
 			if constexpr (ColumnMajor) {
@@ -1929,10 +1983,34 @@ namespace Maths {
 	constexpr auto as_matrix(const V& vector) {
 		return VectorAsMatrix<V, StaticExtent<Stride>, ColumnMajor>{ vector, {} };
 	}
+	template <IndexType Stride, bool ColumnMajor, ConceptVector V>
+	constexpr auto as_matrix(const V& vector) {
+		return VectorAsMatrix<V, StaticExtent<Stride>, ColumnMajor>{ vector, {} };
+	}
+	template <ConceptVectorObject V, IndexType Stride, bool ColumnMajor = false>
+	constexpr auto as_matrix(const V& vector) {
+		return as_matrix<Stride, ColumnMajor>(vector.ref());
+	}
+	template <IndexType Stride, bool ColumnMajor, ConceptVectorObject V>
+	constexpr auto as_matrix(const V& vector) {
+		return as_matrix<Stride, ColumnMajor>(vector.ref());
+	}
 
 	template <ConceptVector V, bool ColumnMajor = false>
 	constexpr auto as_matrix(const V& vector, IndexType stride) {
 		return VectorAsMatrix<V, DynamicExtent, ColumnMajor>{ vector, stride };
+	}
+	template <bool ColumnMajor, ConceptVector V>
+	constexpr auto as_matrix(const V& vector, IndexType stride) {
+		return VectorAsMatrix<V, DynamicExtent, ColumnMajor>{ vector, stride };
+	}
+	template <ConceptVectorObject V, bool ColumnMajor = false>
+	constexpr auto as_matrix(const V& vector, IndexType stride) {
+		return as_matrix<ColumnMajor>(vector.ref(), stride);
+	}
+	template <bool ColumnMajor, ConceptVectorObject V>
+	constexpr auto as_matrix(const V& vector, IndexType stride) {
+		return as_matrix<ColumnMajor>(vector.ref(), stride);
 	}
 
 	template <ConceptVector A, ConceptVector B>
@@ -1979,12 +2057,13 @@ namespace Maths {
 		return clamp(v.ref(), lower, upper);
 	}
 
-	template <ConceptVector L, ConceptVector R>
+	template <ConceptVector L, ConceptVector R, bool ColumnMajor>
 	struct OuterProduct {
 		L left;
 		R right;
 
 		using value_type = invoke_expression_template_result_t<decltype(left[0] * right[0])>;
+		constexpr static bool column_major = ColumnMajor;
 
 		constexpr OuterProduct(const L& l, const R& r)
 			: left(l), right(r)
@@ -1998,9 +2077,13 @@ namespace Maths {
 		constexpr auto column_count() const { return right.size(); }
 	};
 
-	template <ConceptVector L, ConceptVector R>
+	template <ConceptVector L, ConceptVector R, bool ColumnMajor = false>
 	constexpr auto outer_product(const L& l, const R& r) {
-		return OuterProduct{ l, r };
+		return OuterProduct<L, R, ColumnMajor>{ l, r };
+	}
+	template <bool ColumnMajor, ConceptVector L, ConceptVector R>
+	constexpr auto outer_product(const L& l, const R& r) {
+		return OuterProduct<L, R, ColumnMajor>{ l, r };
 	}
 
 	template <ConceptVector L, ConceptVector R>
