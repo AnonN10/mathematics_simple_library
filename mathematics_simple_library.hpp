@@ -21,6 +21,15 @@
 
 namespace Maths {
 
+	namespace Conventions {
+		enum class RayDirection {
+			Incoming,
+			Incident = Incoming,
+			Outgoing,
+			Reflected = Outgoing
+		};
+	}
+
 	using IndexType = std::size_t;
 
 	struct none_t {};
@@ -2185,6 +2194,63 @@ namespace Maths {
 	constexpr auto operator* (const M& m, const V& v) { return column_of(m.ref() * as_column(v), 0); }
 	template <ConceptVector V, ConceptMatrixObject M>
 	constexpr auto operator* (const V& v, const M& m) { return row_of(as_row(v) * m.ref(), 0); }
+
+	template <ConceptVector V, ConceptVector N, typename T>
+	constexpr bool is_total_internal_reflection(const V& v, const N& n, T eta) {
+		assert_extent(v.size(), n.size(), std::equal_to<>{});
+		auto zero = static_cast<T>(0);
+		auto one = static_cast<T>(1);
+		auto nv = inner_product(n, v);
+		auto k = one - eta * eta * (one - nv * nv);
+		return k < zero;
+	}
+	template <ConceptVector V, ConceptVector N, typename T>
+	constexpr bool is_TIR(const V& v, const N& n, T eta) {
+		return is_total_internal_reflection(v, n, eta);
+	}
+
+	template <Conventions::RayDirection RayDirectionConvention, ConceptVector V, ConceptVector N>
+	constexpr auto reflect(const V& v, const N& n) {
+		using value_type = decltype(inner_product(v, n));
+		assert_extent(v.size(), n.size(), std::equal_to<>{});
+		if constexpr (RayDirectionConvention == Conventions::RayDirection::Incoming)
+			return v - static_cast<value_type>(2)*inner_product(v, n)*n;
+		else
+			return -v - static_cast<value_type>(2)*-inner_product(v, n)*n;
+	}
+	template <
+	ConceptVector V,
+	ConceptVector N,
+	Conventions::RayDirection RayDirectionConvention = Conventions::RayDirection::Outgoing>
+	constexpr auto reflect(const V& v, const N& n) {
+		return reflect<RayDirectionConvention>(v, n);
+	}
+
+	template <Conventions::RayDirection RayDirectionConvention, bool TIR, ConceptVector V, ConceptVector N, typename T>
+	constexpr auto refract(const V& v, const N& n, T eta) {
+		using value_type = decltype(inner_product(v, n));
+		using std::sqrt;
+		assert_extent(v.size(), n.size(), std::equal_to<>{});
+		auto zero = static_cast<T>(0);
+		auto one = static_cast<T>(1);
+		auto nv = inner_product(n, v);
+		if constexpr (RayDirectionConvention == Conventions::RayDirection::Outgoing)
+			eta = -eta;
+		auto k = one - eta * eta * (one - nv * nv);
+		if constexpr(TIR) {
+			if (k < zero) return vec(reflect<RayDirectionConvention>(v, n));
+		} else {
+			if (k < zero) return vec(v*static_cast<value_type>(0));
+		}
+		return vec(eta * v - (eta * nv + sqrt(k)) * n);
+	}
+	template <
+	ConceptVector V, ConceptVector N, typename T,
+	bool TIR = true,
+	Conventions::RayDirection RayDirectionConvention = Conventions::RayDirection::Outgoing>
+	constexpr auto refract(const V& v, const N& n, T eta) {
+		return refract<RayDirectionConvention, TIR>(v, n, eta);
+	}
 
 	template <ConceptVector L, ConceptVector R, typename BinaryOperator>
 	struct VectorComponentWiseBinaryOperation {
