@@ -19,7 +19,11 @@
 #include <concepts>
 #include <utility>
 
-namespace Maths {
+#ifndef MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE
+#define MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE Maths
+#endif
+
+namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
 
 	namespace Conventions {
 		enum class RayDirection {
@@ -1001,7 +1005,6 @@ namespace Maths {
 	template <ConceptMatrix M>
 	struct ReducedRowEchelonMatrix {
 		using value_type = M::value_type;
-		//using value_type = std::remove_reference_t<decltype(std::declval<M>()[0,0])>;
 		mat_dynamic_t<value_type> matrix;
 
 		constexpr static bool column_major = M::column_major;
@@ -2155,7 +2158,7 @@ namespace Maths {
 				case 1: return left[2]*right[0] - left[0]*right[2];
 				case 2: return left[0]*right[1] - left[1]*right[0];
 			}
-			return static_cast<std::remove_reference_t<decltype(left[0])>>(0);
+			return static_cast<value_type>(0);
 		}
 
 		constexpr auto size() const { return StaticExtent<3>{}; }
@@ -2226,29 +2229,83 @@ namespace Maths {
 		return reflect<RayDirectionConvention>(v, n);
 	}
 
+	template <ConceptVector V, ConceptVector N, typename T, Conventions::RayDirection RayDirectionConvention, bool TIR>
+	struct Refract {
+		V vector;
+		N normal;
+		T eta;
+		decltype(inner_product(normal, vector)) nv;
+		decltype(T{1} - eta * eta * (T{1} - nv * nv)) k;
+
+		constexpr Refract(const V& v, const N& n, T eta)
+			: vector(v), normal(n), eta(eta)
+		{
+			assert_extent(v.size(), n.size(), std::equal_to<>{});
+			T one {1};
+			nv = inner_product(n, v);
+			if constexpr (RayDirectionConvention == Conventions::RayDirection::Outgoing)
+				this->eta = -eta;
+			k = one - this->eta * this->eta * (one - nv * nv);
+		}
+
+		constexpr auto operator[] (IndexType i) const {
+			using std::sqrt;
+			using value_type = decltype(eta * vector[i] - (eta * nv + sqrt(k)) * normal[i]);
+			decltype(k) zero {0};
+			if constexpr(TIR) {
+				// automatic reflection upon satisfaction of total internal reflection condition
+				if (k < zero) {
+					if constexpr (RayDirectionConvention == Conventions::RayDirection::Incoming)
+						return vector[i] - value_type{2}*nv*normal[i];
+					else
+						return -vector[i] - value_type{2}*-nv*normal[i];
+				}
+			} else {
+				// GLSL behaviour
+				if (k < zero) return value_type{0};
+			}
+			return eta * vector[i] - (eta * nv + sqrt(k)) * normal[i];
+		}
+
+		using value_type = invoke_expression_template_result_t<decltype(std::declval<Refract<V,N,T,RayDirectionConvention,TIR>>()[0])>;
+
+		constexpr auto size() const { return vector.size(); }
+	};
+
 	template <Conventions::RayDirection RayDirectionConvention, bool TIR, ConceptVector V, ConceptVector N, typename T>
 	constexpr auto refract(const V& v, const N& n, T eta) {
-		using value_type = decltype(inner_product(v, n));
-		using std::sqrt;
-		assert_extent(v.size(), n.size(), std::equal_to<>{});
-		auto zero = static_cast<T>(0);
-		auto one = static_cast<T>(1);
-		auto nv = inner_product(n, v);
-		if constexpr (RayDirectionConvention == Conventions::RayDirection::Outgoing)
-			eta = -eta;
-		auto k = one - eta * eta * (one - nv * nv);
-		if constexpr(TIR) {
-			if (k < zero) return vec(reflect<RayDirectionConvention>(v, n));
-		} else {
-			if (k < zero) return vec(v*static_cast<value_type>(0));
-		}
-		return vec(eta * v - (eta * nv + sqrt(k)) * n);
+		return Refract<V, N, T, RayDirectionConvention, TIR> { v, n, eta };
+	}
+	template <Conventions::RayDirection RayDirectionConvention, bool TIR, ConceptVectorObject V, ConceptVector N, typename T>
+	constexpr auto refract(const V& v, const N& n, T eta) {
+		return Refract<decltype(v.ref()), N, T, RayDirectionConvention, TIR> { v.ref(), n, eta };
+	}
+	template <Conventions::RayDirection RayDirectionConvention, bool TIR, ConceptVector V, ConceptVectorObject N, typename T>
+	constexpr auto refract(const V& v, const N& n, T eta) {
+		return Refract<V, decltype(n.ref()), T, RayDirectionConvention, TIR> { v, n.ref(), eta };
+	}
+	template <Conventions::RayDirection RayDirectionConvention, bool TIR, ConceptVectorObject V, ConceptVectorObject N, typename T>
+	constexpr auto refract(const V& v, const N& n, T eta) {
+		return Refract<decltype(v.ref()), decltype(n.ref()), T, RayDirectionConvention, TIR> { v.ref(), n.ref(), eta };
 	}
 	template <
 	ConceptVector V, ConceptVector N, typename T,
 	bool TIR = true,
 	Conventions::RayDirection RayDirectionConvention = Conventions::RayDirection::Outgoing>
 	constexpr auto refract(const V& v, const N& n, T eta) {
+		return refract<RayDirectionConvention, TIR>(v, n, eta);
+	}
+	template <Conventions::RayDirection RayDirectionConvention, bool TIR, ConceptVector V, ConceptVector N, typename T, typename U>
+	constexpr auto refract(const V& v, const N& n, T ior_src, U ior_dest) {
+		auto eta = ior_src/ior_dest;
+		return Refract<V, N, decltype(eta), RayDirectionConvention, TIR> { v, n, eta };
+	}
+	template <
+	ConceptVector V, ConceptVector N, typename T, typename U,
+	bool TIR = true,
+	Conventions::RayDirection RayDirectionConvention = Conventions::RayDirection::Outgoing>
+	constexpr auto refract(const V& v, const N& n, T ior_src, U ior_dest) {
+		auto eta = ior_src/ior_dest;
 		return refract<RayDirectionConvention, TIR>(v, n, eta);
 	}
 

@@ -200,18 +200,24 @@ int main() {
 	PRINT_EXEC(print(normalize(vec_ref({1,1,1}))));
 	PRINT_EXEC(print(normalize_max(vec_ref<float>({1,5,10}))));
 	PRINT_EXEC(print(normalize_minmax(vec_ref<float>({-10,5,10}))));
-	PRINT_EXEC(auto incident_ray = vec<float>({-1,1,0}));
-	PRINT_EXEC(auto normal = vec<float>({0,1,0}));
+	PRINT_EXEC(auto incident_ray = normalize(vec<float>({-1,1,0})));
+	PRINT_EXEC(auto normal = normalize(vec<float>({0,1,0})));
+	PRINT_EXEC(print(incident_ray));
+	PRINT_EXEC(print(normal));
 	PRINT_EXEC(print(reflect(incident_ray, normal)));
 	PRINT_EXEC(print(reflect<Conventions::RayDirection::Outgoing>(incident_ray, normal)));
 	PRINT_EXEC(print(reflect<Conventions::RayDirection::Incoming>(-incident_ray, normal)));
 	PRINT_EXEC(print(reflect(vec_ref<float>({-1,1,0}), vec_ref<float>({0,1,0}))));
 	PRINT_EXEC(decltype(normal)::value_type ior_src = 1.0);
-	PRINT_EXEC(decltype(normal)::value_type ior_dest = 1.333);
+	PRINT_EXEC(decltype(normal)::value_type ior_dest = 1.6);
 	PRINT_EXEC(auto eta = ior_src/ior_dest);
+	PRINT_EXEC(constexpr bool total_internal_reflection = true);
 	PRINT_EXEC(print(refract(incident_ray, normal, eta)));
-	PRINT_EXEC(print(refract<Conventions::RayDirection::Outgoing, true>(incident_ray, normal, eta)));
-	PRINT_EXEC(print(refract<Conventions::RayDirection::Incoming, true>(-incident_ray, normal, eta)));
+	PRINT_EXEC(print(refract<Conventions::RayDirection::Outgoing, total_internal_reflection>(incident_ray, normal, eta)));
+	PRINT_EXEC(print(refract<Conventions::RayDirection::Incoming, total_internal_reflection>(-incident_ray, normal, eta)));
+	PRINT_EXEC(print(refract(incident_ray, normal, ior_src, ior_dest)));
+	PRINT_EXEC(print(refract<Conventions::RayDirection::Outgoing, total_internal_reflection>(incident_ray, normal, ior_dest, ior_src)));
+	PRINT_EXEC(print(refract<Conventions::RayDirection::Outgoing, !total_internal_reflection>(incident_ray, normal, ior_dest, ior_src)));
 	
     return EXIT_SUCCESS;
 }
