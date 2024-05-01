@@ -156,7 +156,7 @@ int main() {
 	
 	std::cout << "## transformation matrices ##" << std::endl;
 	PRINT_EXEC(print(scaling(vec_ref({1, 2, 3}))));
-	PRINT_EXEC(print(rotation(vec_ref({1, 0, 0}), vec_ref({0, 1, 0}), 3.14159265358979)));
+	PRINT_EXEC(print(rotation(vec_ref({1, 0, 0}), vec_ref({0, 1, 0}), std::numbers::pi_v<float>)));
 	PRINT_EXEC(print(translation(vec_ref({4, 5, 6}))));
 	PRINT_EXEC(mat_static_t<4,4,float> transform = mat_identity<4, 4>());
 	PRINT_EXEC(print(transform));
@@ -164,7 +164,7 @@ int main() {
 	PRINT_EXEC(print(transform));
 	PRINT_EXEC(mat_static_t<4,4,float> m_translation = translation(vec_ref<float>({1, 2, 3})));
 	PRINT_EXEC(print(m_translation));
-	PRINT_EXEC(mat_static_t<4,4,float> m_rotation = rotation(vec_ref<float>({1, 0, 0, 0}), vec_ref<float>({0, 1, 0, 0}), 3.14159265358979));
+	PRINT_EXEC(mat_static_t<4,4,float> m_rotation = rotation(vec_ref<float>({1, 0, 0, 0}), vec_ref<float>({0, 1, 0, 0}), std::numbers::pi_v<float>));
 	PRINT_EXEC(print(m_rotation));
 	PRINT_EXEC(mat_static_t<4,4,float> m_scaling = scaling(vec_ref<float>({1, 2, 3, 1})));
 	PRINT_EXEC(print(m_scaling));
