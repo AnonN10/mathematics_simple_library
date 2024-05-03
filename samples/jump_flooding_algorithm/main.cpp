@@ -62,11 +62,7 @@ int main() {
 		});
 		seed = seed_type(
 			position,
-			vec_ref({
-				random_range<float>(0.0, 1.0),
-				random_range<float>(0.0, 1.0),
-				random_range<float>(0.0, 1.0),
-			})
+			vec_procedural<3>([](auto, auto)->auto { return random_range<float>(0.0, 1.0); } )
 		);
 		//row index is y, column index is x - hence y, x
 		auto&& cell = mat_image[position[1], position[0]];
@@ -94,8 +90,8 @@ int main() {
 						if(x==0 && y==0) continue;
 						//sample cell at iteration's offset y, x
 						auto&& sample_cell = mat_image[
-							circshift<std::int32_t>(n, x*offset_scale, image_width),
-							circshift<std::int32_t>(m, y*offset_scale, image_height)
+							circshift<std::int32_t>(m, x*offset_scale, image_width),
+							circshift<std::int32_t>(n, y*offset_scale, image_height)
 						];
 						//if sample is not empty
 						auto sample_seed = std::get<0>(sample_cell);
@@ -137,5 +133,5 @@ int main() {
 
 	std::cout << "Done." << std::endl;
 	
-    return 0;
+    return EXIT_SUCCESS;
 }

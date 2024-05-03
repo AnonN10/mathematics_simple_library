@@ -2,9 +2,16 @@
 #include <iomanip>
 #include <cstdlib>
 
+// optional overridable definitions, here overrided with what would be the defaults
+#define MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE Maths
+#define MATHEMATICS_SIMPLE_LIBRARY_INDEX_TYPE std::size_t
+#define MATHEMATICS_SIMPLE_LIBRARY_DEFAULT_COLUMN_MAJOR false
+#define MATHEMATICS_SIMPLE_LIBRARY_DEFAULT_NUMERICAL_TYPE float
+#define MATHEMATICS_SIMPLE_LIBRARY_DEFAULT_CONVENTION_RAY_DIRECTION Conventions::RayDirection::Outgoing
+
 #include "mathematics_simple_library.hpp"
 
-using namespace Maths;
+using namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE;
 
 #define PRINT_EXEC(...) \
 std::cout << "> " << #__VA_ARGS__ << std::endl;\
@@ -59,6 +66,12 @@ std::ostream &operator<<(std::ostream &os, const M& mat) {
 int main() {
 	std::cout << std::fixed;
 
+	std::cout << "## procedural vector ##" << std::endl;
+	PRINT_EXEC(print(vec_constant<4>(1)));
+	PRINT_EXEC(print(vec_constant(1, 4)));
+	PRINT_EXEC(print(vec_procedural<4>([](auto i, auto size)->auto { return size - i; })));
+	PRINT_EXEC(print(vec_procedural(4, [](auto i, auto size)->auto { return size - i; })));
+
 	std::cout << "## procedural matrix ##" << std::endl;
 	PRINT_EXEC(print(mat_identity<4, 5>()));
 	PRINT_EXEC(print(mat_zero<2, 2>()));
@@ -70,16 +83,28 @@ int main() {
 	PRINT_EXEC(print(mat_procedural<4, 5>([](auto m, auto n, auto rows, auto columns)->int { return m*columns + n; })));
 	std::cout << std::endl;
 
-	std::cout << "## matrix reference (user-defined storage) ##" << std::endl;
+	std::cout << "## vector or matrix reference (user-defined storage) ##" << std::endl;
+	PRINT_EXEC(print(vec_ref({1, 2, 3})));
 	PRINT_EXEC(print(mat_ref<2,3>({1, 2, 3, 4, 5, 6,})));
 	PRINT_EXEC(std::array a = {1, 2, 3, 4});
 	PRINT_EXEC(std::vector b = {4, 3, 2, 1});
+	PRINT_EXEC(print(vec_ref(a)));
+	PRINT_EXEC(print(vec_ref<2>(a.data())));
+	PRINT_EXEC(print(vec_ref(a.data(), 2)));
+	PRINT_EXEC(print(vec_ref(b)));
+	PRINT_EXEC(print(vec_ref(b.data(), 2)));
 	PRINT_EXEC(print(mat_ref<4,1>(a)));
 	PRINT_EXEC(print(mat_ref<1,4>(b)));
 	PRINT_EXEC(print(mat_ref<4,1>(a)*mat_ref<1,4>(b)));
 	std::cout << std::endl;
 
-	std::cout << "## matrix object (embedded storage: std::array or std::vector) ##" << std::endl;
+	std::cout << "## vector or matrix object (embedded storage: std::array or std::vector) ##" << std::endl;
+	PRINT_EXEC(auto vobj_static = vec<2>({1, 2, 3, 4}));
+	PRINT_EXEC(auto vobj_dynamic = vec<float>({1, 2, 3, 4}));
+	PRINT_EXEC(print(vobj_static));
+	PRINT_EXEC(print(vobj_dynamic));
+	PRINT_EXEC(vobj_dynamic.resize(2));
+	PRINT_EXEC(print(vobj_dynamic));
 	PRINT_EXEC(auto mobj_static = mat<2, 2>({1, 2, 3, 4}));
 	PRINT_EXEC(auto mobj_dynamic = mat<float>({1, 2, 3, 4}, 2, 2));
 	PRINT_EXEC(print(mobj_static));
@@ -97,10 +122,17 @@ int main() {
 	std::cout << std::endl;
 	
 	std::cout << "## temporary objects in expressions and underlying type casting via matrix object ##" << std::endl;
+	PRINT_EXEC(auto vector_int = vec<2>({1, 2}));
+	PRINT_EXEC(print(vector_int));
+	PRINT_EXEC(print(vec<float>(vector_int)));
+	PRINT_EXEC(auto vector_of_vectors = vec<2, vec_static_t<2, int>>({{-1, 0}, {1, 2}}));
+	PRINT_EXEC(print(vector_of_vectors));
+	PRINT_EXEC(auto vector_of_float_vectors = vec_static_t<2, vec_static_t<2, float>>(vector_of_vectors));
+	PRINT_EXEC(print(vector_of_float_vectors));
 	PRINT_EXEC(auto matrix_int = mat<2, 2>({1, 2, 3, 4}));
 	PRINT_EXEC(print(matrix_int));
 	PRINT_EXEC(print(mat<float>(matrix_int)));
-	PRINT_EXEC(matrix_int = mat(matrix_int * matrix_int));
+	PRINT_EXEC(matrix_int = mat(matrix_int * matrix_int)); // a temporary is actually required here to avoid simultaneous read and write
 	PRINT_EXEC(print(matrix_int));
 	PRINT_EXEC(auto matrix_of_vectors = mat<2, 2, vec_static_t<2, int>>({{-3, -2}, {-1, 0}, {1, 2}, {3, 4}}));
 	PRINT_EXEC(print(matrix_of_vectors));

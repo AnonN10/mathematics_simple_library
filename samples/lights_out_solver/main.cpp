@@ -1,5 +1,6 @@
 #include <iostream>
 #include <iomanip>
+#include <cstdlib>
 
 #include "mathematics_simple_library.hpp"
 
@@ -91,5 +92,5 @@ int main() {
 	std::cout << "solution:" << std::endl;
 	print(solution, std::cout, 2);
 	
-    return 0;
+    return EXIT_SUCCESS;
 }
