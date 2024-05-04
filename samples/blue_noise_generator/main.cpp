@@ -42,7 +42,7 @@ int main() {
 			complex_value_type radius = matdim/4;
 			auto x = fftshift(static_cast<complex_value_type>(n), static_cast<complex_value_type>(matdim));
 			auto y = fftshift(static_cast<complex_value_type>(m), static_cast<complex_value_type>(matdim));
-			return norm_frobenius(vec_ref<complex_value_type>({x, y})-center_offset) > radius? 1.0 : 0.0;
+			return length(vec_ref<complex_value_type>({x, y})-center_offset) > radius? 1.0 : 0.0;
 		}
 	);
 		
