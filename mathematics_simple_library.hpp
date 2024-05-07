@@ -369,9 +369,9 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
 		return VectorReference<T, StaticExtent<Size>> { base_ptr };
 	}
 	
-	template <typename T>
-	constexpr auto vec_ref(std::initializer_list<T> elements) {
-		return vec_ref<const T>(std::data(elements), std::size(elements));
+	template <typename T, std::size_t N>
+	constexpr auto vec_ref(const T(&elements)[N]) {
+		return VectorReference<const T, StaticExtent<N>> { std::data(elements) };
 	}
 
 	template <typename T, IndexType N>
@@ -1798,8 +1798,8 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
 			return row == column ? one : (column == coefficients.size().get()? coefficients[row] : zero);
 		}
 
-		constexpr auto row_count() const { return coefficients.size()+1; }
-		constexpr auto column_count() const { return coefficients.size()+1; }
+		constexpr auto row_count() const { return evaluate_extent<1>(coefficients.size(), std::plus<>{}); }
+		constexpr auto column_count() const { return evaluate_extent<1>(coefficients.size(), std::plus<>{}); }
 	};
 
 	template <bool ColumnMajor, ConceptVector V>
@@ -2444,33 +2444,69 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
 
 		constexpr auto operator[] (IndexType element) const {
 			if constexpr(InverseTransform) {
+				using std::sin;
+				using std::cos;
 				auto r = coordinates[0];
 				const auto& phi = coordinates;
-
-				auto x_n = r;
-				auto n = element+1;
-				if(n < size().get()) {
-					for(IndexType i = 1; i < n; ++i)
-						x_n *= std::sin(phi[i]);
-					x_n *= std::cos(phi[n]);
+				if constexpr(ConceptVectorStatic<V> && size_static<V>() <= 3) {
+					if constexpr(size_static<V>() == 1) {
+						return r;
+					} else if constexpr(size_static<V>() == 2) {
+						switch (element) {
+							case 0: return r*cos(phi[1]);
+							case 1: return r*sin(phi[1]);
+							default: return value_type{0};
+						}
+					} else if constexpr(size_static<V>() == 3) {
+						switch (element) {
+							case 0: return r*cos(phi[1]);
+							case 1: return r*sin(phi[1])*cos(phi[2]);
+							case 2: return r*sin(phi[1])*sin(phi[2]);
+							default: return value_type{0};
+						}
+					}
 				} else {
-					for(IndexType i = 1; i < size().get(); ++i)
-						x_n *= std::sin(phi[i]);
+					auto x_n = r;
+					auto n = element+1;
+					if(n < size().get()) {
+						for(IndexType i = 1; i < n; ++i)
+							x_n *= sin(phi[i]);
+						x_n *= cos(phi[n]);
+					} else {
+						for(IndexType i = 1; i < size().get(); ++i)
+							x_n *= sin(phi[i]);
+					}
+					return x_n;
 				}
-
-				return x_n;
 			} else {
 				using std::sqrt;
-
-				if(element == 0) {
-					return norm_frobenius(coordinates);
+				using std::atan2;
+				if constexpr(ConceptVectorStatic<V> && size_static<V>() <= 3) {
+					if constexpr(size_static<V>() == 1) {
+						return coordinates[0];
+					} else if constexpr(size_static<V>() == 2) {
+						switch (element) {
+							case 0: return norm_frobenius(coordinates);
+							case 1: return atan2(coordinates[1], coordinates[0]);
+							default: return value_type{0};
+						}
+					} else if constexpr(size_static<V>() == 3) {
+						using std::acos;
+						switch (element) {
+							case 0: return norm_frobenius(coordinates);
+							case 1: return acos(coordinates[0]/norm_frobenius(coordinates));
+							case 2: return atan2(coordinates[2], coordinates[1]);
+							default: return value_type{0};
+						}
+					}
+				} else {
+					if(element == 0)
+						return norm_frobenius(coordinates);
+					auto sum = value_type{0};
+					for (IndexType i = element; i < size().get(); ++i)
+						sum += coordinates[i]*coordinates[i];
+					return atan2(sqrt(sum), coordinates[element-1]);
 				}
-
-				auto sum = value_type{0};
-				for (IndexType i = element; i < size().get(); ++i){
-					sum += coordinates[i]*coordinates[i];
-				}
-				return std::atan2(sqrt(sum), coordinates[element-1]);
 			}
 		}
 
@@ -2479,11 +2515,11 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
 
 	template <ConceptVector V>
 	constexpr auto hyperspherical_to_cartesian(const V& v) {
-		return HypersphericalCoodrinates<V, true> { v };
+		return HypersphericalCoodrinates<decltype(v.ref()), true> { v.ref() };
 	}
 	template <ConceptVector V>
 	constexpr auto cartesian_to_hyperspherical(const V& v) {
-		return HypersphericalCoodrinates<V, false> { v };
+		return HypersphericalCoodrinates<decltype(v.ref()), false> { v.ref() };
 	}
 
 	template <ConceptMatrix M>
