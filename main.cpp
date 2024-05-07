@@ -250,6 +250,18 @@ int main() {
 	PRINT_EXEC(print(refract(incident_ray, normal, ior_src, ior_dest)));
 	PRINT_EXEC(print(refract<Conventions::RayDirection::Outgoing, total_internal_reflection>(incident_ray, normal, ior_dest, ior_src)));
 	PRINT_EXEC(print(refract<Conventions::RayDirection::Outgoing, !total_internal_reflection>(incident_ray, normal, ior_dest, ior_src)));
+	PRINT_EXEC(print(cartesian_to_hyperspherical(vec_ref<float>({1}))));
+	PRINT_EXEC(print(cartesian_to_hyperspherical(vec_ref<float>({1, 2}))));
+	PRINT_EXEC(print(cartesian_to_hyperspherical(vec_ref<float>({1, 2, 3}))));
+	PRINT_EXEC(print(cartesian_to_hyperspherical(vec_ref<float>({1, 2, 3, 4}))));
+	PRINT_EXEC(print(cartesian_to_hyperspherical(vec_ref<float>({1, 2, 3, 4, 5}))));
+	PRINT_EXEC(print(cartesian_to_hyperspherical(vec_ref<float>({1, 2, 3, 4, 5, 6}))));
+	PRINT_EXEC(print(hyperspherical_to_cartesian(cartesian_to_hyperspherical(vec_ref<float>({1})))));
+	PRINT_EXEC(print(hyperspherical_to_cartesian(cartesian_to_hyperspherical(vec_ref<float>({1, 2})))));
+	PRINT_EXEC(print(hyperspherical_to_cartesian(cartesian_to_hyperspherical(vec_ref<float>({1, 2, 3})))));
+	PRINT_EXEC(print(hyperspherical_to_cartesian(cartesian_to_hyperspherical(vec_ref<float>({1, 2, 3, 4})))));
+	PRINT_EXEC(print(hyperspherical_to_cartesian(cartesian_to_hyperspherical(vec_ref<float>({1, 2, 3, 4, 5})))));
+	PRINT_EXEC(print(hyperspherical_to_cartesian(cartesian_to_hyperspherical(vec_ref<float>({1, 2, 3, 4, 5, 6})))));
 	
     return EXIT_SUCCESS;
 }

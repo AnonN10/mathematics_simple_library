@@ -2430,6 +2430,62 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
 		return (v - minimum)/(maximum - minimum);
 	}
 
+	template <ConceptVector V, bool InverseTransform>
+	struct HypersphericalCoodrinates {
+		V coordinates;
+
+		using value_type = V::value_type;
+
+		constexpr HypersphericalCoodrinates(const V& v)
+			: coordinates(v)
+		{}
+
+		constexpr auto ref() const { return *this; }
+
+		constexpr auto operator[] (IndexType element) const {
+			if constexpr(InverseTransform) {
+				auto r = coordinates[0];
+				const auto& phi = coordinates;
+
+				auto x_n = r;
+				auto n = element+1;
+				if(n < size().get()) {
+					for(IndexType i = 1; i < n; ++i)
+						x_n *= std::sin(phi[i]);
+					x_n *= std::cos(phi[n]);
+				} else {
+					for(IndexType i = 1; i < size().get(); ++i)
+						x_n *= std::sin(phi[i]);
+				}
+
+				return x_n;
+			} else {
+				using std::sqrt;
+
+				if(element == 0) {
+					return norm_frobenius(coordinates);
+				}
+
+				auto sum = value_type{0};
+				for (IndexType i = element; i < size().get(); ++i){
+					sum += coordinates[i]*coordinates[i];
+				}
+				return std::atan2(sqrt(sum), coordinates[element-1]);
+			}
+		}
+
+		constexpr auto size() const { return coordinates.size(); }
+	};
+
+	template <ConceptVector V>
+	constexpr auto hyperspherical_to_cartesian(const V& v) {
+		return HypersphericalCoodrinates<V, true> { v };
+	}
+	template <ConceptVector V>
+	constexpr auto cartesian_to_hyperspherical(const V& v) {
+		return HypersphericalCoodrinates<V, false> { v };
+	}
+
 	template <ConceptMatrix M>
 	inline void print(const M& mat, std::ostream& os = std::cout, std::streamsize spacing_width = 12) {
 		for (IndexType row = 0; row < mat.row_count().get(); ++row) {
