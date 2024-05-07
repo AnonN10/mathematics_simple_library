@@ -69,8 +69,8 @@ int main() {
 	std::cout << "## procedural vector ##" << std::endl;
 	PRINT_EXEC(print(vec_constant<4>(1)));
 	PRINT_EXEC(print(vec_constant(1, 4)));
-	PRINT_EXEC(print(vec_procedural<4>([](auto i, auto size)->auto { return size - i; })));
-	PRINT_EXEC(print(vec_procedural(4, [](auto i, auto size)->auto { return size - i; })));
+	PRINT_EXEC(print(vec_procedural<4>([](auto i, auto size) { return size - i; })));
+	PRINT_EXEC(print(vec_procedural(4, [](auto i, auto size) { return size - i; })));
 
 	std::cout << "## procedural matrix ##" << std::endl;
 	PRINT_EXEC(print(mat_identity<4, 5>()));
@@ -121,7 +121,7 @@ int main() {
 	PRINT_EXEC(print(mobj_dynamic));
 	std::cout << std::endl;
 	
-	std::cout << "## temporary objects in expressions and underlying type casting via matrix object ##" << std::endl;
+	std::cout << "## temporary objects in expressions and underlying type casting via object constructor ##" << std::endl;
 	PRINT_EXEC(auto vector_int = vec<2>({1, 2}));
 	PRINT_EXEC(print(vector_int));
 	PRINT_EXEC(print(vec<float>(vector_int)));
@@ -143,8 +143,8 @@ int main() {
 	std::cout << "## unary operators ##" << std::endl;
 	PRINT_EXEC(print(-(vec_ref({4, 5, 6}))));
 	PRINT_EXEC(print(-translation(vec_ref({4, 5, 6}))));
-	PRINT_EXEC(print(unary_operation(vec_ref({1, 2, 3, 4, 5}), [](auto x)->auto { return x*x; })));
-	PRINT_EXEC(print(unary_operation(-translation(vec_ref({4, 5, 6})), [](auto x)->auto { return x*x; })));
+	PRINT_EXEC(print(unary_operation(vec_ref({1, 2, 3, 4, 5}), [](auto x) { return x*x; })));
+	PRINT_EXEC(print(unary_operation(-translation(vec_ref({4, 5, 6})), [](auto x) { return x*x; })));
 	std::cout << std::endl;
 
 	std::cout << "## binary operators ##" << std::endl;
@@ -174,7 +174,7 @@ int main() {
 	PRINT_EXEC(print(kronecker_product(mat_kp_left, mat_kp_right)));
 	PRINT_EXEC(print(hadamard_product(mat({1, 2, 3, 4}, 2, 2), mat({2, 5, 10, 100}, 2, 2))));
 	PRINT_EXEC(std::cout << mat(matrix_of_vectors * matrix_of_vectors) << std::endl);
-	PRINT_EXEC(std::cout << binary_operation(matrix_of_vectors, vec_static_t<2, int>({1, 2}), [](auto a, auto b)->auto { return dot(a, b); }) << std::endl);
+	PRINT_EXEC(std::cout << binary_operation(matrix_of_vectors, vec_static_t<2, int>({1, 2}), [](auto a, auto b) { return dot(a, b); }) << std::endl);
 	std::cout << std::endl;
 
 	std::cout << "## ternary operators ##" << std::endl;
@@ -183,7 +183,7 @@ int main() {
 	PRINT_EXEC(std::cout << clamp(matrix_of_float_vectors, -1.0f, 1.0f));
 	PRINT_EXEC(std::cout << mat<vec_static_t<2, uint8_t>>(clamp(matrix_of_float_vectors, 0.0f, 1.0f) * 255.0f));
 	PRINT_EXEC(std::cout << matrix_int);
-	PRINT_EXEC(std::cout << ternary_operation(matrix_int, 10, 12345, [](const auto& a, auto b, auto c)->auto { return a > b? a : c; }));
+	PRINT_EXEC(std::cout << ternary_operation(matrix_int, 10, 12345, [](const auto& a, auto b, auto c) { return a > b? a : c; }));
 	std::cout << std::endl;
 	
 	std::cout << "## transformation matrices ##" << std::endl;

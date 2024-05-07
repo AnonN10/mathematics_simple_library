@@ -62,7 +62,7 @@ int main() {
 		});
 		seed = seed_type(
 			position,
-			vec_procedural<3>([](auto, auto)->auto { return random_range<float>(0.0, 1.0); } )
+			vec_procedural<3>([](auto, auto) { return random_range<float>(0.0, 1.0); } )
 		);
 		//row index is y, column index is x - hence y, x
 		auto&& cell = mat_image[position[1], position[0]];
@@ -115,14 +115,14 @@ int main() {
 	std::cout << "Transforming to image space..." << std::endl;
 	auto mat_image_data_voronoi = mat<vec_static_t<3, std::uint8_t>>(mat(unary_operation(
 		mat_image,
-		[](const auto& in)->auto {
+		[](const auto& in) {
 			if(!std::get<0>(in)) return std::remove_reference_t<decltype(std::get<1>(*std::get<0>(in)))>{};
 			return std::get<1>(*std::get<0>(in));
 		}
 	))*255);
 	auto mat_image_data_distance_field = mat<std::uint8_t>((unary_operation(
 		mat_image,
-		[](const auto& in)->auto { return std::get<1>(in); }
+		[](const auto& in) { return std::get<1>(in); }
 	))*255);
     
 	std::cout << "Saving to voronoi.png..." << std::endl;

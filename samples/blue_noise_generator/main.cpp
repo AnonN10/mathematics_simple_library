@@ -32,7 +32,7 @@ int main() {
 	std::cout << "Generating white noise matrix..." << std::endl;
 	mat_dynamic_t<std::complex<complex_value_type>> mat = mat_procedural(
 		matdim, matdim,
-		[](auto, auto, auto, auto)->auto { return random_range(zero, one); }
+		[](auto, auto, auto, auto) { return random_range(zero, one); }
 	);
 	std::cout << "Generating filter matrix..." << std::endl;
 	mat_dynamic_t<std::complex<complex_value_type>> mat_filter = mat_procedural(
@@ -59,7 +59,7 @@ int main() {
 	mat = Maths::mat(mat_iDFT * mat) * transpose(mat_iDFT);
 	
 	std::cout << "Reading out the data..." << std::endl;
-    mat_dynamic_t<complex_value_type> mat_real = unary_operation(mat, [](const auto& x)->auto { return x.real(); });
+    mat_dynamic_t<complex_value_type> mat_real = unary_operation(mat, [](const auto& x) { return x.real(); });
 	std::cout << "Transforming to image space..." << std::endl;
 	auto mat_image_data = Maths::mat<uint8_t>(clamp(normalize_minmax(mat_real), zero, one) * 255);
 	
