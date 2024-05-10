@@ -127,7 +127,7 @@ int main() {
 	PRINT_EXEC(print(vec<float>(vector_int)));
 	PRINT_EXEC(auto vector_of_vectors = vec<2, vec_static_t<2, int>>({{-1, 0}, {1, 2}}));
 	PRINT_EXEC(print(vector_of_vectors));
-	PRINT_EXEC(auto vector_of_float_vectors = vec_static_t<2, vec_static_t<2, float>>(vector_of_vectors));
+	PRINT_EXEC(auto vector_of_float_vectors = vec<vec_static_t<2, float>>(vector_of_vectors));
 	PRINT_EXEC(print(vector_of_float_vectors));
 	PRINT_EXEC(auto matrix_int = mat<2, 2>({1, 2, 3, 4}));
 	PRINT_EXEC(print(matrix_int));
@@ -204,6 +204,31 @@ int main() {
 	PRINT_EXEC(print(transform));
 	PRINT_EXEC(transform_dynamic = m_translation * m_rotation * m_scaling);
 	PRINT_EXEC(print(transform_dynamic));
+	std::cout << std::endl;
+
+	std::cout << "## quaternion ##" << std::endl;
+	PRINT_EXEC(print(quat_ref(vec_ref<float>({1, 0, 0, 0}))));
+	PRINT_EXEC(auto qaa = quat_axis_angle(vec_ref<float>({0, 1, 0}), std::numbers::pi_v<float>));
+	PRINT_EXEC(print(qaa));
+	PRINT_EXEC(print(as_matrix(qaa)));
+	PRINT_EXEC(auto q = quat(vec_ref<float>({5, 6, 0, 0})));
+	PRINT_EXEC(print(as_matrix<4, 4>(q)));
+	PRINT_EXEC(auto qnorm = quat_ref(normalize(q)));
+	PRINT_EXEC(auto qmat = mat(as_matrix(q)));
+	PRINT_EXEC(print(qmat));
+	PRINT_EXEC(auto qnormmat = mat(as_matrix(qnorm)));
+	PRINT_EXEC(print(qnormmat));
+	PRINT_EXEC(auto vqtr = vec<float>({1, 1, 0}));
+	PRINT_EXEC(print(vqtr));
+	PRINT_EXEC(print(qnormmat * vqtr));
+	PRINT_EXEC(print(qnorm * vqtr));
+	PRINT_EXEC(print(qnorm * quat(vec<float>({float{0}, vqtr[0], vqtr[1], vqtr[2]})) * inverse(qnorm)));
+	PRINT_EXEC(print(qmat * vqtr));
+	PRINT_EXEC(print(q * vqtr));
+	PRINT_EXEC(print(vqtr * q));
+	PRINT_EXEC(print(q * vqtr * q));
+	PRINT_EXEC(print(q * quat(vec<float>({float{0}, vqtr[0], vqtr[1], vqtr[2]})) * inverse(q)));
+	PRINT_EXEC(print(q * quat(vec<float>({float{0}, vqtr[0], vqtr[1], vqtr[2]})) * conjugate(q)));
 	std::cout << std::endl;
 	
 	std::cout << "## function library ##" << std::endl;
