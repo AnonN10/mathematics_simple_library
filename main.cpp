@@ -105,6 +105,16 @@ int main() {
 	PRINT_EXEC(print(vobj_dynamic));
 	PRINT_EXEC(vobj_dynamic.resize(2));
 	PRINT_EXEC(print(vobj_dynamic));
+	PRINT_EXEC(auto joined_vec = vec(vobj_dynamic, vobj_static));
+	PRINT_EXEC(print(joined_vec));
+	PRINT_EXEC(auto joined_vec2 = vec(vobj_static, vobj_dynamic));
+	PRINT_EXEC(print(joined_vec2));
+	PRINT_EXEC(auto joined_vec3 = vec(vec_ref({0, 1, 2}), vec_ref({3, 4})));
+	PRINT_EXEC(print(joined_vec3));
+	PRINT_EXEC(auto joined_vec4 = vec(joined_vec3, 5));
+	PRINT_EXEC(print(joined_vec4));
+	PRINT_EXEC(auto truncated_vec = vec<2>(joined_vec4));
+	PRINT_EXEC(print(truncated_vec));
 	PRINT_EXEC(auto mobj_static = mat<2, 2>({1, 2, 3, 4}));
 	PRINT_EXEC(auto mobj_dynamic = mat<float>({1, 2, 3, 4}, 2, 2));
 	PRINT_EXEC(print(mobj_static));
@@ -206,6 +216,31 @@ int main() {
 	PRINT_EXEC(print(transform_dynamic));
 	std::cout << std::endl;
 
+	std::cout << "## rectangular matrix partition access (block matrices) ##" << std::endl;
+	PRINT_EXEC(print(mobj_dynamic));
+	PRINT_EXEC(print(rectangular_partition<2, 2, 2, 2>(mobj_dynamic)));
+	PRINT_EXEC(print(rectangular_partition<2, 4, 2, 4>(mobj_dynamic)));
+	PRINT_EXEC(print(rectangular_partition<1, 1, 2, 4>(mobj_dynamic)));
+	PRINT_EXEC(print(rectangular_partition(mobj_dynamic, 2, 2, 2, 2)));
+	PRINT_EXEC(print(rectangular_partition(mobj_dynamic, 2, 4, 2, 4)));
+	PRINT_EXEC(print(rectangular_partition(mobj_dynamic, 1, 1, 2, 4)));
+	PRINT_EXEC(print(rectangular_partition(mobj_dynamic, 3, 3, 1, 1)));
+	PRINT_EXEC(print(mobj_dynamic));
+	PRINT_EXEC(rectangular_partition(mobj_dynamic, 3, 3, 1, 1)[0,0] = 5);
+	PRINT_EXEC(print(mobj_dynamic));
+	PRINT_EXEC(print(mobj_static));
+	PRINT_EXEC(print(rectangular_partition<1, 1, 1, 1>(mobj_static)));
+	PRINT_EXEC(print(rectangular_partition<1, 4, 1, 4>(mobj_static)));
+	PRINT_EXEC(print(rectangular_partition<1, 1, 0, 4>(mobj_static)));
+	PRINT_EXEC(print(rectangular_partition(mobj_static, 1, 1, 1, 1)));
+	PRINT_EXEC(print(rectangular_partition(mobj_static, 1, 4, 1, 4)));
+	PRINT_EXEC(print(rectangular_partition(mobj_static, 1, 1, 0, 4)));
+	PRINT_EXEC(print(rectangular_partition(mobj_static, 1, 1, 0, 4)));
+	PRINT_EXEC(print(rectangular_partition(mobj_static, 1, 1, 1, 1)));
+	PRINT_EXEC(print(mobj_static));
+	PRINT_EXEC(rectangular_partition(mobj_static, 1, 1, 1, 1)[0,0] = 5);
+	PRINT_EXEC(print(mobj_static));
+
 	std::cout << "## quaternion ##" << std::endl;
 	PRINT_EXEC(print(quat_ref(vec_ref<float>({1, 0, 0, 0}))));
 	PRINT_EXEC(auto qaa = quat_axis_angle(vec_ref<float>({0, 1, 0}), std::numbers::pi_v<float>));
@@ -245,6 +280,7 @@ int main() {
 	PRINT_EXEC(print(transpose(dftmat)));
 	PRINT_EXEC(print(transpose_hermitian(dftmat)));
 	PRINT_EXEC(print(transpose_hermitian(dftmat)*dftmat));
+	PRINT_EXEC(print(join(vec_ref({0, 1, 2}), vec_ref({3, 4}))));
 	PRINT_EXEC(print(augment(mat_multiplicative_identity(4, 4), mat_hadamard_identity(4, 2))));
 	PRINT_EXEC(print(split_right(transform, 2)));
 	PRINT_EXEC(print(normalize(transform)));
@@ -287,6 +323,7 @@ int main() {
 	PRINT_EXEC(print(hyperspherical_to_cartesian(cartesian_to_hyperspherical(vec_ref<float>({1, 2, 3, 4})))));
 	PRINT_EXEC(print(hyperspherical_to_cartesian(cartesian_to_hyperspherical(vec_ref<float>({1, 2, 3, 4, 5})))));
 	PRINT_EXEC(print(hyperspherical_to_cartesian(cartesian_to_hyperspherical(vec_ref<float>({1, 2, 3, 4, 5, 6})))));
-	
+	std::cout << std::endl;
+
     return EXIT_SUCCESS;
 }
