@@ -324,6 +324,6 @@ int main() {
 	PRINT_EXEC(print(hyperspherical_to_cartesian(cartesian_to_hyperspherical(vec_ref<float>({1, 2, 3, 4, 5})))));
 	PRINT_EXEC(print(hyperspherical_to_cartesian(cartesian_to_hyperspherical(vec_ref<float>({1, 2, 3, 4, 5, 6})))));
 	std::cout << std::endl;
-
+	
     return EXIT_SUCCESS;
 }

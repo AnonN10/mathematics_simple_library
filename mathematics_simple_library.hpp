@@ -2479,9 +2479,14 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
 	template <typename Field, ConceptVector V>
 	constexpr auto operator* (const Field& l, const V& r) { return r * l; }
 	template <ConceptVector V, typename Field>
+	requires (!ConceptVector<Field>)
 	constexpr auto operator/ (const V& l, const Field& r) {
 		return VectorScalarBinaryOperation<decltype(l.ref()), Field, std::divides<>, false>{ l.ref(), r };
 	}
+	template <typename Field, ConceptVector V> requires (!ConceptVector<Field> && !ConceptVectorStatic<V>)
+	constexpr auto operator/ (const Field& l, const V& r) { return as_vector(l, r.size().get()) / r; }
+	template <typename Field, ConceptVectorStatic V> requires (!ConceptVector<Field>)
+	constexpr auto operator/ (const Field& l, const V& r) { return as_vector<size_static<V>()>(l) / r; }
 	template <ConceptVector V, typename Field>
 	constexpr auto operator+ (const V& l, const Field& r) {
 		return VectorScalarBinaryOperation<decltype(l.ref()), Field, std::plus<>, false>{ l.ref(), r };
@@ -2900,12 +2905,12 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
 	constexpr auto as_matrix(const Q& q, IndexType rows, IndexType columns) { return as_matrix<ColumnMajor, Q>(q, rows, columns); }
 
 	template <ConceptVector V, bool InverseTransform>
-	struct HypersphericalCoodrinates {
+	struct HypersphericalCoordinates {
 		V coordinates;
 
 		using value_type = V::value_type;
 
-		constexpr HypersphericalCoodrinates(const V& v)
+		constexpr HypersphericalCoordinates(const V& v)
 			: coordinates(v)
 		{}
 
@@ -2984,11 +2989,11 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
 
 	template <ConceptVector V>
 	constexpr auto hyperspherical_to_cartesian(const V& v) {
-		return HypersphericalCoodrinates<decltype(v.ref()), true> { v.ref() };
+		return HypersphericalCoordinates<decltype(v.ref()), true> { v.ref() };
 	}
 	template <ConceptVector V>
 	constexpr auto cartesian_to_hyperspherical(const V& v) {
-		return HypersphericalCoodrinates<decltype(v.ref()), false> { v.ref() };
+		return HypersphericalCoordinates<decltype(v.ref()), false> { v.ref() };
 	}
 
 	template <ConceptMatrix M>

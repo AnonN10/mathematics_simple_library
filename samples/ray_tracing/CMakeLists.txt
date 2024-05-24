@@ -32,7 +32,7 @@ endif()
 
 add_subdirectory(contrib/sdl)
 
-target_link_libraries(${PROJECT_NAME} PRIVATE SDL2::SDL2 SDL2::SDL2main)
+target_link_libraries(${PROJECT_NAME} PRIVATE SDL2::SDL2main SDL2::SDL2)
 
 if (WIN32)
 # copy the .dll file to the same folder as the executable

@@ -9,6 +9,9 @@
 
 using namespace Maths;
 
+using ivec2 = vec_static_t<2, int>;
+using ivec3 = vec_static_t<3, int>;
+using ivec4 = vec_static_t<4, int>;
 using vec2 = vec_static_t<2, float>;
 using vec3 = vec_static_t<3, float>;
 using vec4 = vec_static_t<4, float>;
@@ -56,7 +59,7 @@ mat3 tangent_space_from_normal(const vec3& n) {
     float b = n[0] * n[1] * a;
     vec3 t = vec3{1.0f + s * n[0]* n[0] * a, s * b, -s * n[0]};
     vec3 bt = vec3{b, s + n[1] * n[1] * a, -n[1]};
-    return join(join(as_column(t), as_column(n)), as_column(bt));
+    return mat(join(join(as_column(t), as_column(n)), as_column(bt)));
 }
 
 float checker_pattern(const vec2& uv, float scale) {
@@ -88,7 +91,7 @@ struct AABB : Shape {
     IntersectionResult Trace(const vec3& ro, const vec3& rd, float t_min, float t_max) {
         IntersectionResult result;
 
-        auto rcp_rd = vec3(as_vector<3,float>(1)/rd);
+        auto rcp_rd = 1/rd;
         auto t_bmin = (bmin - ro) * rcp_rd;
         auto t_bmax = (bmax - ro) * rcp_rd;
         auto t_1 = Maths::min(t_bmin, t_bmax);
@@ -117,8 +120,9 @@ struct AABB : Shape {
                 0.0f
             };
             if(!outside) result.normal = -result.normal;
-            auto normal_space_point_in_box = transpose(tangent_space_from_normal(result.normal))*(point_in_box+1)*0.5;
-            result.uv = vec_ref({normal_space_point_in_box[0], normal_space_point_in_box[2]});
+            vec3 normal_space_point_in_box = transpose(tangent_space_from_normal(result.normal))*(point_in_box+1)*0.5;
+            result.uv[0] = normal_space_point_in_box[0];
+            result.uv[1] = normal_space_point_in_box[2];
             result.hit = true;
         }
 
@@ -148,11 +152,12 @@ struct Sphere : Shape {
             float t = outside? t_near : t_far;
             if(t >= t_min && t <= t_max) {
                 result.t = t;
-                result.normal = normalize(ro + t*rd);
-                if(!outside) result.normal = -result.normal;
                 auto hit_point = ro + t*rd;
-                auto uv_map = cartesian_to_hyperspherical(vec_ref({hit_point[1], hit_point[0], hit_point[2]}));
-                result.uv = vec_ref({uv_map[2]/(std::numbers::pi_v<float>*2), uv_map[1]/std::numbers::pi_v<float>});
+                result.normal = normalize(hit_point);
+                if(!outside) result.normal = -result.normal;
+                auto uv_map = cartesian_to_hyperspherical(join(join(as_vector<1>(hit_point[1]), hit_point[0]), hit_point[2]));
+                result.uv[0] = uv_map[2]/(std::numbers::pi_v<float>*2);
+                result.uv[1] = uv_map[1]/std::numbers::pi_v<float>;
                 result.hit = true;
             }
         }
@@ -175,8 +180,9 @@ struct Plane : Shape {
         if(t >= t_min && t <= t_max){
             result.t = t;
             result.normal = normalize(vec_ref({a, b, c}));
-            auto plane_space_hit_point = transpose(tangent_space_from_normal(result.normal))*(ro + t*rd);
-            result.uv = vec_ref({plane_space_hit_point[0], plane_space_hit_point[2]});
+            vec3 plane_space_hit_point = transpose(tangent_space_from_normal(result.normal))*(ro + t*rd);
+            result.uv[0] = plane_space_hit_point[0];
+            result.uv[1] = plane_space_hit_point[2];
             result.hit = true;
         }
 
@@ -299,7 +305,7 @@ int main(int argc, char ** argv) {
 	SDL_PixelFormat* pxfmt = SDL_AllocFormat(SDL_PIXELFORMAT_ARGB8888);
 
     //translation along x, y, z axes
-    vec3 camera_position {0, 0, 0};
+    vec3 camera_position {0, 0, 2};
     //rotation around x, y, z axes
     vec3 camera_rotation {0, 0, 0};
 
@@ -382,16 +388,17 @@ int main(int argc, char ** argv) {
         world.objects[1]->transform.scaling[0] = std::sin(std::numbers::pi_v<float> * 2.0f * 0.1f * time_elapsed) * 4.0f;
         world.Update();
 
+        auto image_size = ivec2{
+            static_cast<int>(image_buffer.column_count().get()),
+            static_cast<int>(image_buffer.row_count().get())
+        };
         //set fixed tile size
         const int threads_per_dim = std::sqrt(std::thread::hardware_concurrency());
-        const vec_static_t<2, int> tile_size {
-            static_cast<int>(image_buffer.column_count().get())/threads_per_dim,
-            static_cast<int>(image_buffer.row_count().get())/threads_per_dim
-        };
+        const auto tile_size = image_size/threads_per_dim;
         //calculate horizontal and vertical tile count
-		vec_static_t<2, int> tile_count {
-            static_cast<int>(image_buffer.column_count().get() / tile_size[0] + (image_buffer.column_count().get() % tile_size[0] > 0)),
-            static_cast<int>(image_buffer.row_count().get() / tile_size[1] + (image_buffer.row_count().get() % tile_size[1] > 0))
+		ivec2 tile_count {
+            static_cast<int>(image_size[0] / tile_size[0] + (image_size[0] % tile_size[0] > 0)),
+            static_cast<int>(image_size[1] / tile_size[1] + (image_size[1] % tile_size[1] > 0))
         };
         //iterate each tile
 		for (int i = 0; i < tile_count[1]; ++i) {
@@ -399,22 +406,20 @@ int main(int argc, char ** argv) {
                 //schedule a thread per tile
 				pool.push([&, i, j](size_t thread_id) {
                     //use block matrix partitioner to create a matrix for access to this tile
-                    auto tile_origin_x = j*tile_size[0];
-                    auto tile_origin_y = i*tile_size[1];
-                    auto tile = rectangular_partition(image_buffer, tile_origin_y, tile_size[1], tile_origin_x, tile_size[0]);
+                    auto tile_origin = ivec2{j*tile_size[0], i*tile_size[1]};
+                    auto tile = rectangular_partition(image_buffer, tile_origin[1], tile_size[1], tile_origin[0], tile_size[0]);
                     //perform operation on the tile matrix
                     tile = unary_operation<true>(
                         tile,
                         [&](auto val, auto tile_y, auto tile_x) {
-                            auto x = static_cast<float>(tile_origin_x + tile_x);
-                            auto y = static_cast<float>(tile_origin_y + tile_y);
-                            auto u = x/image_buffer.column_count().get();
-                            auto v = 1-y/image_buffer.row_count().get();
+                            auto tile_pos = vec<int>(vec_ref({tile_x, tile_y}));
+                            auto image_pos = tile_origin + tile_pos;
+                            auto uv = vec2(vec<float>(image_pos)/image_size); uv[1] = 1-uv[1];
                             auto ray_origin = homogeneous_division(
-                                inv_viewproj * vec4{u*2-1, v*2-1, 0, 1}
+                                inv_viewproj * join(uv*2-1, vec2{0, 1})
                             );
                             auto ray_direction = normalize(homogeneous_division(
-                                inv_viewproj * vec4{u*2-1, v*2-1, 1, 1}
+                                inv_viewproj * join(uv*2-1, vec2{1, 1})
                             ) - ray_origin);
 
                             vec3 color {0, 0, 0};
@@ -425,12 +430,12 @@ int main(int argc, char ** argv) {
                                 //color = (ires_closest.normal+1)/2;
                                 //color = join(ires_closest.uv, 0);
                                 color = as_vector<3>(checker_pattern(ires_closest.uv, 4.0f));
-                                auto light_direction = normalize(vec_ref<float>({1, 2, 3}));
+                                /*auto light_direction = normalize(vec_ref<float>({1, 2, 3}));
                                 auto hit_point = ray_origin + ray_direction * ires_closest.t;
                                 auto hit_point_shifted = hit_point + ires_closest.normal * 0.001f;
-                                color *= as_vector<3, float>(1)*std::clamp(dot(ires_closest.normal, light_direction), 0.0f, 1.0f);
+                                color *= as_vector<3, float>(std::clamp(dot(ires_closest.normal, light_direction), 0.0f, 1.0f));
                                 //trace shadow
-                                color *= world.TraceAny(hit_point_shifted, light_direction, 0.0f, std::numeric_limits<float>::max()).hit? 0 : 1;
+                                color *= world.TraceAny(hit_point_shifted, light_direction, 0.0f, std::numeric_limits<float>::max()).hit? 0 : 1;*/
                             }
 
                             return SDL_MapRGBA(
