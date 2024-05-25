@@ -59,7 +59,7 @@ mat3 tangent_space_from_normal(const vec3& n) {
     float b = n[0] * n[1] * a;
     vec3 t = vec3{1.0f + s * n[0]* n[0] * a, s * b, -s * n[0]};
     vec3 bt = vec3{b, s + n[1] * n[1] * a, -n[1]};
-    return mat(join(join(as_column(t), as_column(n)), as_column(bt)));
+    return join(join(as_column(t), as_column(n)), as_column(bt));
 }
 
 float checker_pattern(const vec2& uv, float scale) {
@@ -155,9 +155,8 @@ struct Sphere : Shape {
                 auto hit_point = ro + t*rd;
                 result.normal = normalize(hit_point);
                 if(!outside) result.normal = -result.normal;
-                auto uv_map = cartesian_to_hyperspherical(join(join(as_vector<1>(hit_point[1]), hit_point[0]), hit_point[2]));
-                result.uv[0] = uv_map[2]/(std::numbers::pi_v<float>*2);
-                result.uv[1] = uv_map[1]/std::numbers::pi_v<float>;
+                auto uv_map = vec(cartesian_to_hyperspherical(vec_ref({hit_point[1], hit_point[0], hit_point[2]})));
+                result.uv = vec_ref({uv_map[2]/(std::numbers::pi_v<float>*2), uv_map[1]/std::numbers::pi_v<float>});
                 result.hit = true;
             }
         }
@@ -415,12 +414,12 @@ int main(int argc, char ** argv) {
                             auto tile_pos = vec<int>(vec_ref({tile_x, tile_y}));
                             auto image_pos = tile_origin + tile_pos;
                             auto uv = vec2(vec<float>(image_pos)/image_size); uv[1] = 1-uv[1];
-                            auto ray_origin = homogeneous_division(
+                            auto ray_origin = vec(homogeneous_division(
                                 inv_viewproj * join(uv*2-1, vec2{0, 1})
-                            );
-                            auto ray_direction = normalize(homogeneous_division(
+                            ));
+                            auto ray_direction = vec(normalize(homogeneous_division(
                                 inv_viewproj * join(uv*2-1, vec2{1, 1})
-                            ) - ray_origin);
+                            ) - ray_origin));
 
                             vec3 color {0, 0, 0};
 
@@ -430,12 +429,12 @@ int main(int argc, char ** argv) {
                                 //color = (ires_closest.normal+1)/2;
                                 //color = join(ires_closest.uv, 0);
                                 color = as_vector<3>(checker_pattern(ires_closest.uv, 4.0f));
-                                /*auto light_direction = normalize(vec_ref<float>({1, 2, 3}));
+                                auto light_direction = vec(normalize(vec_ref<float>({1, 2, 3})));
                                 auto hit_point = ray_origin + ray_direction * ires_closest.t;
                                 auto hit_point_shifted = hit_point + ires_closest.normal * 0.001f;
                                 color *= as_vector<3, float>(std::clamp(dot(ires_closest.normal, light_direction), 0.0f, 1.0f));
                                 //trace shadow
-                                color *= world.TraceAny(hit_point_shifted, light_direction, 0.0f, std::numeric_limits<float>::max()).hit? 0 : 1;*/
+                                color *= world.TraceAny(hit_point_shifted, light_direction, 0.0f, std::numeric_limits<float>::max()).hit? 0 : 1;
                             }
 
                             return SDL_MapRGBA(

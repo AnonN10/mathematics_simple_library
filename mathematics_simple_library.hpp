@@ -677,6 +677,55 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
 	}
 
 	template <typename Field, ConceptExtent ExtR, ConceptExtent ExtC, bool ColumnMajor>
+	struct MatrixConstant {
+    	Field value;
+		ExtR rows;
+		ExtC columns;
+
+		using value_type = Field;
+		constexpr static bool column_major = ColumnMajor;
+
+		constexpr MatrixConstant(const Field& value, const ExtR& rows = {}, const ExtC& columns = {})
+			: value(value), rows(rows), columns(columns)
+		{}
+
+		constexpr auto ref() const { return *this; }
+
+		constexpr Field operator[] ([[maybe_unused]] IndexType row, [[maybe_unused]] IndexType column) const {
+			return value;
+		}
+
+		constexpr auto row_count() const { return rows; }
+		constexpr auto column_count() const { return columns; }
+	};
+
+	template <bool ColumnMajor, IndexType Rows, IndexType Columns, typename T>
+	constexpr auto mat_constant(const T& value) {
+		return MatrixConstant<T, StaticExtent<Rows>, StaticExtent<Columns>, ColumnMajor> { value };
+	}
+	template <IndexType Rows, IndexType Columns, typename T, bool ColumnMajor = ColumnMajorDefault>
+	constexpr auto mat_constant(const T& value) {
+		return mat_constant<ColumnMajor, Rows, Columns, T>(value);
+	}
+	template <IndexType Rows, IndexType Columns, typename T, bool ColumnMajor = ColumnMajorDefault>
+	constexpr auto as_matrix(const T& value) {
+		return mat_constant<ColumnMajor, Rows, Columns, T>(value);
+	}
+
+	template <bool ColumnMajor, typename T>
+	constexpr auto mat_constant(const T& value, IndexType rows, IndexType columns) {
+		return MatrixConstant<T, DynamicExtent, DynamicExtent, ColumnMajor> { value, rows, columns };
+	}
+	template <typename T, bool ColumnMajor = ColumnMajorDefault>
+	constexpr auto mat_constant(const T& value, IndexType rows, IndexType columns) {
+		return mat_constant<ColumnMajor, T>(value, rows, columns);
+	}
+	template <typename T, bool ColumnMajor = ColumnMajorDefault>
+	constexpr auto as_matrix(const T& value, IndexType rows, IndexType columns) {
+		return mat_constant<ColumnMajor, T>(value, rows, columns);
+	}
+
+	template <typename Field, ConceptExtent ExtR, ConceptExtent ExtC, bool ColumnMajor>
 	struct MatrixReference {
 		Field* base_ptr;
 		ExtR rows;

@@ -17,50 +17,52 @@ using namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE;
 std::cout << "> " << #__VA_ARGS__ << std::endl;\
 __VA_ARGS__\
 
-template<typename T, std::size_t N>
-std::ostream &operator<<(std::ostream &os, const std::array<T, N>& arr) {
-	std::string out = "(";
-	if(!arr.empty()) {
-		for(std::size_t i = 0; i < arr.size() - 1; ++i)
-			out += std::to_string(arr[i]) + ", ";
-		out += std::to_string(arr.back());
+namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
+	template<typename T, std::size_t N>
+	std::ostream &operator<<(std::ostream &os, const std::array<T, N>& arr) {
+		std::string out = "(";
+		if(!arr.empty()) {
+			for(std::size_t i = 0; i < arr.size() - 1; ++i)
+				out += std::to_string(arr[i]) + ", ";
+			out += std::to_string(arr.back());
+		}
+		out += ")";
+		return os << out;
 	}
-	out += ")";
-    return os << out;
-}
 
-template<typename T>
-std::ostream &operator<<(std::ostream &os, const std::vector<T>& vec) {
-	std::string out = "(";
-	if(!vec.empty()) {
-		for(std::size_t i = 0; i < vec.size() - 1; ++i)
-			out += std::to_string(vec[i]) + ", ";
-		out += std::to_string(vec.back());
+	template<typename T>
+	std::ostream &operator<<(std::ostream &os, const std::vector<T>& vec) {
+		std::string out = "(";
+		if(!vec.empty()) {
+			for(std::size_t i = 0; i < vec.size() - 1; ++i)
+				out += std::to_string(vec[i]) + ", ";
+			out += std::to_string(vec.back());
+		}
+		out += ")";
+		return os << out;
 	}
-	out += ")";
-    return os << out;
-}
 
-template <ConceptVector V>
-std::ostream &operator<<(std::ostream &os, const V& vec) {
-	std::string out = "(";
-	if(vec.size().get() > 0) {
-		for(std::size_t i = 0; i < vec.size().get() - 1; ++i)
-			out += std::to_string(vec[i]) + ", ";
-		out += std::to_string(vec[vec.size().get()-1]);
+	template <ConceptVector V>
+	std::ostream &operator<<(std::ostream &os, const V& vec) {
+		std::string out = "(";
+		if(vec.size().get() > 0) {
+			for(std::size_t i = 0; i < vec.size().get() - 1; ++i)
+				out += std::to_string(vec[i]) + ", ";
+			out += std::to_string(vec[vec.size().get()-1]);
+		}
+		out += ")";
+		return os << out;
 	}
-	out += ")";
-    return os << out;
-}
 
-template <ConceptMatrix M>
-std::ostream &operator<<(std::ostream &os, const M& mat) {
-	for (IndexType row = 0; row < mat.row_count().get(); ++row) {
-		for (IndexType col = 0; col < mat.column_count().get(); ++col)
-			os << std::setw(12) << mat[row, col] << ",";
-		os << std::endl;
+	template <ConceptMatrix M>
+	std::ostream &operator<<(std::ostream &os, const M& mat) {
+		for (IndexType row = 0; row < mat.row_count().get(); ++row) {
+			for (IndexType col = 0; col < mat.column_count().get(); ++col)
+				os << std::setw(12) << mat[row, col] << ",";
+			os << std::endl;
+		}
+		return os;
 	}
-	return os;
 }
 
 int main() {
@@ -76,6 +78,8 @@ int main() {
 	PRINT_EXEC(print(mat_identity<4, 5>()));
 	PRINT_EXEC(print(mat_zero<2, 2>()));
 	PRINT_EXEC(print(mat_one<2, 2>()));
+	PRINT_EXEC(print(mat_constant<2, 2, float>(7)));
+	PRINT_EXEC(print(mat_constant<float>(7, 2, 2)));
 	PRINT_EXEC(print(mat_DFT<4>()));
 	PRINT_EXEC(print(mat_DFT(4)));
 	PRINT_EXEC(print(mat_walsh_sylvester<int>(8)));
@@ -324,6 +328,6 @@ int main() {
 	PRINT_EXEC(print(hyperspherical_to_cartesian(cartesian_to_hyperspherical(vec_ref<float>({1, 2, 3, 4, 5})))));
 	PRINT_EXEC(print(hyperspherical_to_cartesian(cartesian_to_hyperspherical(vec_ref<float>({1, 2, 3, 4, 5, 6})))));
 	std::cout << std::endl;
-	
+
     return EXIT_SUCCESS;
 }
