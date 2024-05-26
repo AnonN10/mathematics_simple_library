@@ -285,14 +285,14 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
 
 	template <typename V>
 	concept ConceptQuaternion = ConceptVectorStatic<V> && size_static<V>() == 4 && requires(const V& vector) {
-		std::same_as<typename V::tag_type, const QuaternionTag&>;
+		{ std::same_as<typename V::tag_type, const QuaternionTag&> };
 	};
 
 	template <typename M>
 	concept ConceptMatrix = requires(const M& matrix, IndexType row, IndexType column) {
 		typename M::value_type;
 		{ M::column_major } -> std::same_as<const bool&>;
-		{ matrix[row, column] };
+		{ matrix.operator[](row, column) };
 		{ matrix.row_count() } -> ConceptExtent;
 		{ matrix.column_count() } -> ConceptExtent;
 	};
@@ -1632,7 +1632,6 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
 		constexpr auto operator[] (IndexType row, IndexType column) const {
 			auto&& l = row_of(left, row);
 			auto&& r = column_of(right, column);
-			//assert_extent(l.size(), r.size(), std::equal_to<>{});
 			using T = decltype(l[0]);
 			//dot product
 			T sum = T{0};

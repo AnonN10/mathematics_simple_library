@@ -434,7 +434,7 @@ int main(int argc, char ** argv) {
                                 auto hit_point_shifted = hit_point + ires_closest.normal * 0.001f;
                                 color *= as_vector<3, float>(std::clamp(dot(ires_closest.normal, light_direction), 0.0f, 1.0f));
                                 //trace shadow
-                                color *= world.TraceAny(hit_point_shifted, light_direction, 0.0f, std::numeric_limits<float>::max()).hit? 0 : 1;
+                                color *= world.TraceAny(hit_point_shifted, light_direction, 0.0f, std::numeric_limits<float>::max()).hit? 0.1f : 1.0f;
                             }
 
                             return SDL_MapRGBA(
