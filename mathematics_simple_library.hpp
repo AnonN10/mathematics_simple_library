@@ -2240,7 +2240,30 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
 	}
 	template <ConceptVector A, ConceptVector B>
 	constexpr auto inner_product_euclidean(const A& a, const B& b) {
-		return (as_row(a) * as_column(b))[0, 0];
+		using T = decltype(a[0]*b[0] + a[0]*b[0]);
+		static constexpr size_t N = 4;
+		const size_t count = a.size().get();
+
+		size_t i = 0;
+		T sum = T{0};
+		if (count >= N) {
+			T sum_vec[N];
+			for (size_t j = 0; j < N; ++j)
+				sum_vec[j] = T{0};
+
+			for (; i + N < count; i += N) {
+				for (size_t j = 0; j < N; ++j)
+					sum_vec[j] += a[i + j] * b[i + j];
+			}
+			
+			sum = sum_vec[0];
+			for (size_t j = 1; j < N; ++j)
+				sum += sum_vec[j];
+		}
+
+		for (; i < count; ++i)
+			sum += a[i] * b[i];
+		return sum;
 	}
 	template <ConceptVector A, ConceptVector B>
 	requires

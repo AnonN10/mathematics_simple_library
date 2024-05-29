@@ -30,7 +30,7 @@ else()
     message(WARNING "Couldn't figure out the compiler to set architecture.")
 endif()
 
-add_subdirectory(contrib/sdl)
+add_subdirectory(contrib/SDL)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE SDL2::SDL2main SDL2::SDL2)
 

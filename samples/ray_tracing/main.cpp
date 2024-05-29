@@ -68,6 +68,10 @@ float checker_pattern(const vec2& uv, float scale) {
     return ((u_mod_1 < 0.5 && v_mod_1 < 0.5) || (u_mod_1 > 0.5 && v_mod_1 > 0.5))? 1.0f : 0.0f;
 }
 
+float beer_lambert_law(float mu, float distance) {
+    return std::exp(-mu*distance);
+}
+
 struct IntersectionResult {
     bool hit = false;
     float t = std::numeric_limits<float>::max();
@@ -121,8 +125,7 @@ struct AABB : Shape {
             };
             if(!outside) result.normal = -result.normal;
             vec3 normal_space_point_in_box = transpose(tangent_space_from_normal(result.normal))*(point_in_box+1)*0.5;
-            result.uv[0] = normal_space_point_in_box[0];
-            result.uv[1] = normal_space_point_in_box[2];
+            result.uv = vec_ref({normal_space_point_in_box[0], normal_space_point_in_box[2]});
             result.hit = true;
         }
 
@@ -208,12 +211,74 @@ struct Transform {
     }
 };
 
+struct Material {
+    Material() = default;
+    virtual ~Material() = default;
+
+    //overly-simplified model that can only redirect paths along
+    //one deterministic direction in the spirit of whitted-style path tracing
+    //returns boolean value which when set to false terminates the path
+    virtual bool Evaluate(const IntersectionResult& ires, vec3& ray_origin, vec3& ray_direction, vec3& throughput, int& refraction_count) = 0;
+};
+
+struct DiffuseMaterial : Material {
+    vec3 tint;
+    DiffuseMaterial(const vec3& tint) : tint(tint) {};
+
+    bool Evaluate(const IntersectionResult& ires, vec3& ray_origin, vec3& ray_direction, vec3& throughput, int& refraction_count) {
+        throughput *= tint;
+        //stop building the path and do the final shading
+        return false;
+    }
+};
+
+struct MirrorMaterial : Material {
+    vec3 tint;
+    MirrorMaterial(const vec3& tint) : tint(tint) {};
+
+    bool Evaluate(const IntersectionResult& ires, vec3& ray_origin, vec3& ray_direction, vec3& throughput, int& refraction_count) {
+        throughput *= tint;
+        //reflect the ray along normal
+        ray_origin = ray_origin + ray_direction * ires.t + ires.normal * 0.0001f;
+        ray_direction = reflect<Conventions::RayDirection::Incident>(ray_direction, ires.normal);
+        return true;
+    }
+};
+
+struct GlassMaterial : Material {
+    vec3 tint;
+
+    GlassMaterial(const vec3& tint) : tint(tint) {};
+
+    bool Evaluate(const IntersectionResult& ires, vec3& ray_origin, vec3& ray_direction, vec3& throughput, int& refraction_count) {
+        //refract the ray along normal
+        ray_origin = ray_origin + ray_direction * ires.t - ires.normal * 0.0001f;
+        constexpr bool TotalInternalReflection = true;
+        constexpr float IndexOfRefractionAir = 1.0;
+        constexpr float IndexOfRefractionGlass = 1.5;
+        //odd-even test to determine whether we are entering or exiting the solid
+        bool outside = refraction_count%2;
+        if(!outside) throughput *= tint;
+        ray_direction = refract<Conventions::RayDirection::Incident, TotalInternalReflection>(
+            ray_direction,
+            ires.normal,
+            outside?IndexOfRefractionGlass:IndexOfRefractionAir,
+            outside?IndexOfRefractionAir:IndexOfRefractionGlass
+        );
+        ++refraction_count;
+        return true;
+    }
+};
+
 struct Object {
     std::unique_ptr<Shape> shape;
+    std::unique_ptr<Material> material;
     Transform transform;
     mat4 inv_world;
 
-    Object(std::unique_ptr<Shape>&& shape) : shape(std::move(shape)) {}
+    Object(std::unique_ptr<Shape>&& shape, std::unique_ptr<Material>&& material)
+     : shape(std::move(shape)), material(std::move(material))
+    {}
     ~Object() = default;
 
     void Update() {
@@ -244,12 +309,15 @@ struct World {
         }
     }
 
-    IntersectionResult TraceClosest(vec3 ray_origin, vec3 ray_direction, float t_min, float t_max) {
+    IntersectionResult TraceClosest(vec3 ray_origin, vec3 ray_direction, float t_min, float t_max, Material*& hit_mat) {
         IntersectionResult ires_closest;
         //in a real application a top-level acceleration data structure is employed instead of linear search
         for(auto&& obj : objects) {
             IntersectionResult ires = obj->Trace(ray_origin, ray_direction, 0.0f, std::numeric_limits<float>::max());
-            if(!ires_closest.hit || ires.t < ires_closest.t) ires_closest = ires;
+            if(!ires_closest.hit || ires.t < ires_closest.t) {
+                ires_closest = ires;
+                hit_mat = obj->material.get();
+            }
         }
         return ires_closest;
     }
@@ -313,12 +381,45 @@ int main(int argc, char ** argv) {
     bvh::v2::ThreadPool pool;
 
     World world;
-    world.AddObject(std::make_unique<Object>(std::make_unique<AABB>(vec3{-1, -1, -1}, vec3{1, 1, 1})));
-    world.AddObject(std::make_unique<Object>(std::make_unique<Sphere>(1.0f)));
-    world.AddObject(std::make_unique<Object>(std::make_unique<Plane>(0, 1, 0, 0)));
+    world.AddObject(
+        std::make_unique<Object>(
+            std::make_unique<AABB>(
+                vec3{-1, -1, -1},
+                vec3{1, 1, 1}
+            ),
+            std::make_unique<DiffuseMaterial>(
+                vec3{1.0f, 0.7f, 0.4f}
+            )
+        )
+    );
+    world.AddObject(
+        std::make_unique<Object>(
+            std::make_unique<Sphere>(1.0f),
+            std::make_unique<MirrorMaterial>(
+                vec3{1, 1, 1}
+            )
+        )
+    );
+    world.AddObject(
+        std::make_unique<Object>(
+            std::make_unique<Plane>(0, 1, 0, 0),
+            std::make_unique<DiffuseMaterial>(
+                vec3{0.9f, 1.0f, 0.9f}
+            )
+        )
+    );
     world.objects.back()->transform.translation[1] = -2;
     world.objects.back()->transform.scaling[0] = 10.0f;
     world.objects.back()->transform.scaling[2] = 10.0f;
+    world.AddObject(
+        std::make_unique<Object>(
+            std::make_unique<Sphere>(1.0f),
+            std::make_unique<GlassMaterial>(
+                vec3{0.7f, 0.9f, 1.0f}
+            )
+        )
+    );
+    world.objects.back()->transform.translation[2] = -7;
 
     Timer timer;
     float time_elapsed = timer.elapsed();
@@ -422,19 +523,35 @@ int main(int argc, char ** argv) {
                             ) - ray_origin));
 
                             vec3 color {0, 0, 0};
+                            vec3 throughput {1, 1, 1};
+                            IntersectionResult ires_closest;
+                            int refraction_count = 0;
+                            float distance_traveled_in_air = 0.0f;
 
-                            IntersectionResult ires_closest = world.TraceClosest(ray_origin, ray_direction, 0.0f, std::numeric_limits<float>::max());
-
-                            if(ires_closest.hit) {
-                                //color = (ires_closest.normal+1)/2;
-                                //color = join(ires_closest.uv, 0);
-                                color = as_vector<3>(checker_pattern(ires_closest.uv, 4.0f));
-                                auto light_direction = vec(normalize(vec_ref<float>({1, 2, 3})));
-                                auto hit_point = ray_origin + ray_direction * ires_closest.t;
-                                auto hit_point_shifted = hit_point + ires_closest.normal * 0.001f;
-                                color *= as_vector<3, float>(std::clamp(dot(ires_closest.normal, light_direction), 0.0f, 1.0f));
-                                //trace shadow
-                                color *= world.TraceAny(hit_point_shifted, light_direction, 0.0f, std::numeric_limits<float>::max()).hit? 0.1f : 1.0f;
+                            //trace a path with a fixed maximum amount of vertices between each line-segment (ray)
+                            for(int path_vertex = 0; path_vertex < 5; ++path_vertex) {
+                                Material* ptr_hit_mat = nullptr;
+                                ires_closest = world.TraceClosest(ray_origin, ray_direction, 0.0f, std::numeric_limits<float>::max(), ptr_hit_mat);
+                                if(ires_closest.hit) {
+                                    auto hit_point = ray_origin + ray_direction * ires_closest.t;
+                                    if(!(refraction_count%2)) distance_traveled_in_air += length(hit_point - ray_origin);
+                                    if(ptr_hit_mat->Evaluate(ires_closest, ray_origin, ray_direction, throughput, refraction_count)) continue;
+                                    color = as_vector<3>(checker_pattern(ires_closest.uv, 4.0f));
+                                    color *= throughput;
+                                    auto light_direction = vec(normalize(vec_ref<float>({1, 2, 3})));
+                                    auto hit_point_shifted = hit_point + ires_closest.normal * 0.001f;
+                                    color *= as_vector<3, float>(std::clamp(dot(ires_closest.normal, light_direction), 0.0f, 1.0f));
+                                    //trace shadow
+                                    color *= world.TraceAny(hit_point_shifted, light_direction, 0.0f, std::numeric_limits<float>::max()).hit? 0.1f : 1.0f;
+                                    //fog absorption
+                                    color *= beer_lambert_law(0.05f, distance_traveled_in_air);
+                                    //color = (ires_closest.normal+1)/2;
+                                    //color = join(ires_closest.uv, 0);
+                                    break;
+                                }
+                                //sky
+                                color = vec_ref({0.4f, 0.7f, 1.0f}) * std::clamp(dot(ray_direction, vec_ref({0, 1, 0})), 0.0f, 1.0f);
+                                break;
                             }
 
                             return SDL_MapRGBA(
