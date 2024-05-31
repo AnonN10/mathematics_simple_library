@@ -275,13 +275,18 @@ struct Object {
     std::unique_ptr<Material> material;
     Transform transform;
     mat4 inv_world;
+    std::function<void(Object*)> update_func;
 
-    Object(std::unique_ptr<Shape>&& shape, std::unique_ptr<Material>&& material)
-     : shape(std::move(shape)), material(std::move(material))
+    Object(
+        std::unique_ptr<Shape>&& shape,
+        std::unique_ptr<Material>&& material,
+        std::function<void(Object*)>&& update_func = nullptr
+    ) : shape(std::move(shape)), material(std::move(material)), update_func(std::move(update_func))
     {}
     ~Object() = default;
 
     void Update() {
+        if(update_func) update_func(this);
         inv_world = inverse(transform.Compose());
     }
 
@@ -376,9 +381,11 @@ int main(int argc, char ** argv) {
     //rotation around x, y, z axes
     vec3 camera_rotation {0, 0, 0};
 
-    auto proj = projection(std::numbers::pi_v<float>/2.0, static_cast<float>(image_buffer.column_count().get())/image_buffer.row_count().get(), 0.01, 100.0);
+    auto proj = projection(std::numbers::pi_v<float>/2.0, static_cast<float>(image_buffer.column_count().get())/image_buffer.row_count().get(), 0.01, 1.0);
 
-    bvh::v2::ThreadPool pool;
+    Timer timer;
+    float time_elapsed = timer.elapsed();
+    float time_delta = time_elapsed;
 
     World world;
     world.AddObject(
@@ -389,7 +396,13 @@ int main(int argc, char ** argv) {
             ),
             std::make_unique<DiffuseMaterial>(
                 vec3{1.0f, 0.7f, 0.4f}
-            )
+            ),
+            [&time_delta, &time_elapsed](auto obj) {
+                obj->transform.rotation *= quat_axis_angle(vec3{0, 1, 0}, std::numbers::pi_v<float> * 2.0f * time_delta);
+                obj->transform.translation[0] = std::cos(std::numbers::pi_v<float> * 2.0f * 0.1f * time_elapsed) * 4.0f;
+                obj->transform.translation[1] = std::cos(std::numbers::pi_v<float> * 2.0f * 0.5f * time_elapsed);
+                obj->transform.translation[2] = std::sin(std::numbers::pi_v<float> * 2.0f * 0.1f * time_elapsed) * 4.0f;
+            }
         )
     );
     world.AddObject(
@@ -397,7 +410,10 @@ int main(int argc, char ** argv) {
             std::make_unique<Sphere>(1.0f),
             std::make_unique<MirrorMaterial>(
                 vec3{1, 1, 1}
-            )
+            ),
+            [&time_elapsed](auto obj) {
+                obj->transform.scaling[0] = std::sin(std::numbers::pi_v<float> * 2.0f * 0.1f * time_elapsed) * 4.0f;
+            }
         )
     );
     world.AddObject(
@@ -421,14 +437,13 @@ int main(int argc, char ** argv) {
     );
     world.objects.back()->transform.translation[2] = -7;
 
-    Timer timer;
-    float time_elapsed = timer.elapsed();
+    bvh::v2::ThreadPool pool;
 
     while (!quit) {
         //update time variables
         float time_elapsed_previous = time_elapsed;
         time_elapsed = timer.elapsed();
-        float time_delta = time_elapsed - time_elapsed_previous;
+        time_delta = time_elapsed - time_elapsed_previous;
 
         //handle SDL2 events
 		SDL_Event event;
@@ -481,11 +496,6 @@ int main(int argc, char ** argv) {
         mat4 inv_viewproj = inverse(proj*view);
 
         //update world objects
-        world.objects[0]->transform.rotation *= quat_axis_angle(vec3{0, 1, 0}, std::numbers::pi_v<float> * 2.0f * time_delta);
-        world.objects[0]->transform.translation[0] = std::cos(std::numbers::pi_v<float> * 2.0f * 0.1f * time_elapsed) * 4.0f;
-        world.objects[0]->transform.translation[1] = std::cos(std::numbers::pi_v<float> * 2.0f * 0.5f * time_elapsed);
-        world.objects[0]->transform.translation[2] = std::sin(std::numbers::pi_v<float> * 2.0f * 0.1f * time_elapsed) * 4.0f;
-        world.objects[1]->transform.scaling[0] = std::sin(std::numbers::pi_v<float> * 2.0f * 0.1f * time_elapsed) * 4.0f;
         world.Update();
 
         auto image_size = ivec2{
@@ -516,7 +526,7 @@ int main(int argc, char ** argv) {
                             auto image_pos = tile_origin + tile_pos;
                             auto uv = vec2(vec<float>(image_pos)/image_size); uv[1] = 1-uv[1];
                             auto ray_origin = vec(homogeneous_division(
-                                inv_viewproj * join(uv*2-1, vec2{0, 1})
+                                inv_viewproj * join(uv*2-1, vec2{-1, 1})
                             ));
                             auto ray_direction = vec(normalize(homogeneous_division(
                                 inv_viewproj * join(uv*2-1, vec2{1, 1})
@@ -539,12 +549,16 @@ int main(int argc, char ** argv) {
                                     color = as_vector<3>(checker_pattern(ires_closest.uv, 4.0f));
                                     color *= throughput;
                                     auto light_direction = vec(normalize(vec_ref<float>({1, 2, 3})));
-                                    auto hit_point_shifted = hit_point + ires_closest.normal * 0.001f;
-                                    color *= as_vector<3, float>(std::clamp(dot(ires_closest.normal, light_direction), 0.0f, 1.0f));
+                                    float shading = dot(ires_closest.normal, light_direction);
                                     //trace shadow
-                                    color *= world.TraceAny(hit_point_shifted, light_direction, 0.0f, std::numeric_limits<float>::max()).hit? 0.1f : 1.0f;
+                                    auto hit_point_shifted = hit_point + ires_closest.normal * 0.001f;
+                                    shading *= world.TraceAny(hit_point_shifted, light_direction, 0.0f, std::numeric_limits<float>::max()).hit? 0.0f : 1.0f;
+                                    //fake ambient and clamp to 1
+                                    shading = std::clamp(shading, 0.1f, 1.0f);
                                     //fog absorption
-                                    color *= beer_lambert_law(0.05f, distance_traveled_in_air);
+                                    shading *= beer_lambert_law(0.05f, distance_traveled_in_air);
+                                    //apply shading
+                                    color *= shading;
                                     //color = (ires_closest.normal+1)/2;
                                     //color = join(ires_closest.uv, 0);
                                     break;
