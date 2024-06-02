@@ -244,6 +244,7 @@ int main() {
 	PRINT_EXEC(print(mobj_static));
 	PRINT_EXEC(rectangular_partition(mobj_static, 1, 1, 1, 1)[0,0] = 5);
 	PRINT_EXEC(print(mobj_static));
+	std::cout << std::endl;
 
 	std::cout << "## quaternion ##" << std::endl;
 	PRINT_EXEC(print(quat_ref(vec_ref<float>({1, 0, 0, 0}))));
@@ -251,6 +252,9 @@ int main() {
 	PRINT_EXEC(print(qaa));
 	PRINT_EXEC(print(as_matrix(qaa)));
 	PRINT_EXEC(auto q = quat(vec_ref<float>({5, 6, 0, 0})));
+	PRINT_EXEC(mat_static_t<3,3,double> qm3x3 = as_matrix<3, 3>(q));
+	PRINT_EXEC(print(qm3x3));
+	PRINT_EXEC(print(as_quat(qm3x3)));
 	PRINT_EXEC(print(as_matrix<4, 4>(q)));
 	PRINT_EXEC(auto qnorm = quat_ref(normalize(q)));
 	PRINT_EXEC(auto qmat = mat(as_matrix(q)));
@@ -315,6 +319,10 @@ int main() {
 	PRINT_EXEC(print(refract(incident_ray, normal, ior_src, ior_dest)));
 	PRINT_EXEC(print(refract<Conventions::RayDirection::Outgoing, total_internal_reflection>(incident_ray, normal, ior_dest, ior_src)));
 	PRINT_EXEC(print(refract<Conventions::RayDirection::Outgoing, !total_internal_reflection>(incident_ray, normal, ior_dest, ior_src)));
+	PRINT_EXEC(std::cout << scalar_projection(incident_ray, normal) << std::endl);
+	PRINT_EXEC(print(vector_projection(incident_ray, normal)));
+	PRINT_EXEC(print(vector_rejection(incident_ray, normal)));
+	PRINT_EXEC(print(orthonormalize(incident_ray, normal)));
 	PRINT_EXEC(print(cartesian_to_hyperspherical(vec_ref<float>({1}))));
 	PRINT_EXEC(print(cartesian_to_hyperspherical(vec_ref<float>({1, 2}))));
 	PRINT_EXEC(print(cartesian_to_hyperspherical(vec_ref<float>({1, 2, 3}))));

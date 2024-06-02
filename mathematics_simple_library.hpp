@@ -2461,6 +2461,26 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
 		return refract<RayDirectionConvention, TIR>(v, n, eta);
 	}
 
+	template <ConceptVector A, ConceptVector B>
+	constexpr auto scalar_projection(const A& a, const B& b) {
+		return dot(a, normalize(b));
+	}
+
+	template <ConceptVector A, ConceptVector B>
+	constexpr auto vector_projection(const A& a, const B& b) {
+		return normalize(b) * scalar_projection(a, b);
+	}
+
+	template <ConceptVector A, ConceptVector B>
+	constexpr auto vector_rejection(const A& a, const B& b) {
+		return a - vector_projection(a, b);
+	}
+
+	template <ConceptVector A, ConceptVector B>
+	constexpr auto orthonormalize(const A& a, const B& b) {
+		return normalize(vector_rejection(a, b));
+	}
+
 	template <ConceptVector L, ConceptVector R, typename BinaryOperator, bool Indexed>
 	struct VectorComponentWiseBinaryOperation {
 		L left;
@@ -2757,6 +2777,18 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
 		return (v - minimum)/(maximum - minimum);
 	}
 
+	template <ConceptVector A, ConceptVector B, typename T>
+	constexpr auto spherical_linear_interpolation(const A& a, const B& b, const T& t) {
+		using std::sin;
+		using std::acos;
+		auto omega = acos(inner_product_euclidean(a, b));
+		return (a*sin((T{1} - t)*omega) + b*sin(t*omega))/sin(omega);
+	}
+	template <ConceptVector A, ConceptVector B, typename T>
+	constexpr auto slerp(const A& a, const B& b, const T& t) {
+		return spherical_linear_interpolation(a, b, t);
+	}
+
 	template <ConceptVector V>
 	struct Quaternion {
 		V components;
@@ -2974,6 +3006,57 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
 	}
 	template <ConceptQuaternion Q, bool ColumnMajor = ColumnMajorDefault>
 	constexpr auto as_matrix(const Q& q, IndexType rows, IndexType columns) { return as_matrix<ColumnMajor, Q>(q, rows, columns); }
+
+	template <ConceptMatrix M>
+	struct MatrixAsQuaternion {
+		M matrix;
+		std::remove_const_t<typename M::value_type> scale;
+
+		using tag_type = QuaternionTag;
+		using value_type = typename M::value_type;
+
+		constexpr MatrixAsQuaternion(const M& m) : matrix(m)
+		{
+			using std::pow;
+			assert_extent(m.row_count(), StaticExtent<3>{}, std::equal_to<>{});
+			assert_extent(m.column_count(), StaticExtent<3>{}, std::equal_to<>{});
+
+			scale = pow(determinant(matrix), decltype(scale){1/3.0});
+		}
+
+		constexpr auto ref() const { return *this; }
+
+		constexpr auto operator[] (IndexType element) const {
+			using std::sqrt;
+			using std::max;
+			using std::copysign;
+			constexpr value_type zero {0};
+			constexpr value_type two {2};
+			switch(element) {
+				case 0: {
+					return sqrt(max(zero, scale + matrix[0,0] + matrix[1,1] + matrix[2,2])) / two;
+				}
+				case 1: {
+					return copysign(sqrt(max(zero, scale + matrix[0,0] - matrix[1,1] - matrix[2,2])) / two, matrix[2,1]-matrix[1,2]);
+				}
+				case 2: {
+					return copysign(sqrt(max(zero, scale - matrix[0,0] + matrix[1,1] - matrix[2,2])) / two, matrix[0,2]-matrix[2,0]);
+				}
+				default: {
+					return copysign(sqrt(max(zero, scale - matrix[0,0] - matrix[1,1] + matrix[2,2])) / two, matrix[1,0]-matrix[0,1]);
+				}
+			}
+		}
+
+		constexpr auto size() const { return StaticExtent<4>{}; }
+	};
+
+	template <ConceptMatrix M>
+	constexpr auto as_quaternion(const M& m) {
+		return MatrixAsQuaternion<decltype(m.ref())> { m.ref() };
+	}
+	template <ConceptMatrix M>
+	constexpr auto as_quat(const M& m) { return as_quaternion(m); }
 
 	template <ConceptVector V, bool InverseTransform>
 	struct HypersphericalCoordinates {
