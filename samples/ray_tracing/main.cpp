@@ -479,7 +479,6 @@ int main(int argc, char ** argv) {
             camera_rotation += vec3{static_cast<float>(mouse_delta_y), static_cast<float>(mouse_delta_x), 0} * 0.005;
             inactivity_timer = inactivity_timer_initial;
         }
-        auto rotation = quat(quat_axis_angle(vec3{0, 1, 0}, camera_rotation[1]) * quat_axis_angle(vec3{1, 0, 0}, camera_rotation[0]));
 
         //handle keyboard controls and update position
         const Uint8* keystate = SDL_GetKeyboardState(nullptr);
@@ -493,21 +492,27 @@ int main(int argc, char ** argv) {
         speed *= time_delta;
         if (keystate[SDL_SCANCODE_A]) {
 			camera_position += rotation * vec3{-speed, 0, 0};
+            inactivity_timer = inactivity_timer_initial;
 		}
 		if (keystate[SDL_SCANCODE_D]) {
 			camera_position += rotation * vec3{speed, 0, 0};
+            inactivity_timer = inactivity_timer_initial;
 		}
 		if (keystate[SDL_SCANCODE_Q]) {
 			camera_position += rotation * vec3{0, -speed, 0};
+            inactivity_timer = inactivity_timer_initial;
 		}
 		if (keystate[SDL_SCANCODE_E]) {
 			camera_position += rotation * vec3{0, speed, 0};
+            inactivity_timer = inactivity_timer_initial;
 		}
 		if (keystate[SDL_SCANCODE_S]) {
 			camera_position += rotation * vec3{0, 0, -speed};
+            inactivity_timer = inactivity_timer_initial;
 		}
 		if (keystate[SDL_SCANCODE_W]) {
 			camera_position += rotation * vec3{0, 0, speed};
+            inactivity_timer = inactivity_timer_initial;
 		}
 
         //view matrix is inverted because from the camera's point of view everything is transforming in the opposite way

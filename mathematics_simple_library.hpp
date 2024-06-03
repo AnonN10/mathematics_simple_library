@@ -122,12 +122,12 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
 			return circular_shift(-x, width/static_cast<T>(2), width);
 	}
 
-	template <typename T, typename U>
-	constexpr T linear_interpolation(T a, T b, U t) {
-		return a*(static_cast<U>(1) - t) + b*t;
+	template <typename A, typename B, typename T>
+	constexpr auto linear_interpolation(const A& a, const B& b, const T& t) {
+		return a*(T{1} - t) + b*t;
 	}
-	template <typename T, typename U>
-	constexpr T lerp(T a, T b, U t) { return linear_interpolation(a, b, t); }
+	template <typename A, typename B, typename T>
+	constexpr auto lerp(const A& a, const B& b, const T& t) { return linear_interpolation(a, b, t); }
 
 	template <typename T>
 	constexpr T kronecker_delta(IndexType i, IndexType j) { return static_cast<T>(i==j); }
@@ -3071,7 +3071,11 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
 		using std::sin;
 		using std::acos;
 		auto omega = acos(inner_product_euclidean(a, b));
-		return (a*sin((T{1} - t)*omega) + b*sin(t*omega))/sin(omega);
+        bool reduce_to_lerp = !(omega > std::numeric_limits<T>::epsilon());
+		T t_a = reduce_to_lerp? T{1} - t : sin((T{1} - t)*omega);
+		T t_b = reduce_to_lerp? t : sin(t*omega);
+		T denom = reduce_to_lerp? T{1} : sin(omega);
+		return (a*t_a + b*t_b)/denom;
 	}
 	template <ConceptVector A, ConceptVector B, typename T>
 	constexpr auto slerp(const A& a, const B& b, const T& t) {
@@ -3085,7 +3089,8 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
 		using tag_type = QuaternionTag;
 		using value_type = V::value_type;
 
-		constexpr Quaternion(const V& v) : components(v)
+        template<ConceptVector U>
+		constexpr Quaternion(const U& v) : components(v)
 		{
 			assert_extent(v.size(), StaticExtent<4>{}, std::equal_to<>{});
 		}
@@ -3093,6 +3098,10 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
 		constexpr auto ref() const { return *this; }
 
 		constexpr auto operator[] (IndexType element) const {
+			return components[element];
+		}
+
+		constexpr auto& operator[] (IndexType element) {
 			return components[element];
 		}
 		
@@ -3346,6 +3355,20 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
 	}
 	template <ConceptMatrix M>
 	constexpr auto as_quat(const M& m) { return as_quaternion(m); }
+
+    template <ConceptQuaternion A, ConceptQuaternion B>
+    constexpr auto slerp_flip(const A& src_quat, const B& ref_quat) {
+        if(inner_product_euclidean(src_quat, ref_quat) < 0)
+            return quat(-src_quat);
+        return quat(src_quat);
+    }
+
+	template <ConceptVector F, ConceptVector U>
+	constexpr auto quat_look_rotation(const F& forward, const U& up) {
+		auto up_orthonormal = orthonormalize(up, forward);
+		auto right = cross(up_orthonormal, forward);
+		return as_quaternion(join(join(as_column(right), as_column(up_orthonormal)), as_column(forward)));
+	}
 
 	template <ConceptVector V, bool InverseTransform>
 	struct HypersphericalCoordinates {
