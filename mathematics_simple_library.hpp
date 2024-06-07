@@ -1992,6 +1992,186 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
 		return mat_walsh_sylvester<DynamicExtent, T, ColumnMajor>(dimension);
 	}
 
+    template <typename T, bool ColumnMajor>
+	struct MatrixPerspectiveProjection {
+		T left, right, bottom, top, near, far, depth_near, depth_far;
+
+		using value_type = T;
+		constexpr static bool column_major = ColumnMajor;
+
+		MatrixPerspectiveProjection(
+            const T& left, const T& right,
+            const T& bottom, const T& top,
+            const T& near, const T& far,
+            const T& depth_near, const T& depth_far
+        ) : 
+        left(left), right(right), bottom(bottom), top(top),
+        near(near), far(far), depth_near(depth_near), depth_far(depth_far)
+		{}
+
+		constexpr auto ref() const { return *this; }
+
+		auto operator[] (IndexType row, IndexType column) const {
+            using std::numeric_limits;
+            constexpr value_type zero{0};
+            constexpr value_type one{1};
+            constexpr value_type two{2};
+			switch(column) {
+                case 0: {
+                    switch(row) {
+                        case 0: return two*near/(right - left);
+                        default: return zero;
+                    }
+                }
+                case 1: {
+                    switch(row) {
+                        case 1: return two*near/(top - bottom);
+                        default: return zero;
+                    }
+                }
+                case 2: {
+                    switch(row) {
+                        case 0: return (right + left)/(right - left);
+                        case 1: return (top + bottom)/(top - bottom);
+                        case 2: return
+                            far != numeric_limits<decltype(far)>::infinity()?
+                            (depth_far*far - depth_near*near)/(far - near) :
+                            far;
+                        case 3: return one;
+                        default: return zero;
+                    }
+                }
+                case 3: {
+                    switch(row) {
+                        case 2: return
+                            far != numeric_limits<decltype(far)>::infinity()?
+                            -(far*near*(depth_far - depth_near)/(far - near)) :
+                            -near*(depth_far - depth_near);
+                        default: return zero;
+                    }
+                }
+                default: return kronecker_delta<value_type>(row, column);
+            }
+		}
+
+		auto row_count() const { return StaticExtent<4>{}; }
+		auto column_count() const { return StaticExtent<4>{}; }
+	};
+
+	template <typename T = NumericalTypeDefault, bool ColumnMajor = ColumnMajorDefault>
+	inline auto mat_projection_perspective(
+        const T& left, const T& right,
+        const T& bottom, const T& top,
+        const T& near, const T& far,
+        const T& depth_near, const T& depth_far) {
+		return MatrixPerspectiveProjection<T, ColumnMajor>(left, right, bottom, top, near, far, depth_near, depth_far);
+	}
+
+    template <typename T = NumericalTypeDefault, bool ColumnMajor = ColumnMajorDefault>
+	inline auto mat_projection_perspective(
+        const T& field_of_view,
+        const T& aspect_ratio,
+        const T& near, const T& far,
+        const T& depth_near, const T& depth_far) {
+        using std::tan;
+        T tangent = tan(field_of_view/2);
+        T top = near * tangent;
+        T right = top * aspect_ratio;
+		return MatrixPerspectiveProjection<T, ColumnMajor>(-right, right, -top, top, near, far, depth_near, depth_far);
+	}
+
+    template <typename T, bool ColumnMajor>
+	struct MatrixOrthographicProjection {
+		T left, right, bottom, top, near, far, depth_near, depth_far;
+
+		using value_type = T;
+		constexpr static bool column_major = ColumnMajor;
+
+		MatrixOrthographicProjection(
+            const T& left, const T& right,
+            const T& bottom, const T& top,
+            const T& near, const T& far,
+            const T& depth_near, const T& depth_far
+        ) : 
+        left(left), right(right), bottom(bottom), top(top),
+        near(near), far(far), depth_near(depth_near), depth_far(depth_far)
+		{}
+
+		constexpr auto ref() const { return *this; }
+
+		auto operator[] (IndexType row, IndexType column) const {
+            using std::numeric_limits;
+            constexpr value_type zero{0};
+            constexpr value_type one{1};
+            constexpr value_type two{2};
+			switch(column) {
+                case 0: {
+                    switch(row) {
+                        case 0: return two/(right - left);
+                        default: return zero;
+                    }
+                }
+                case 1: {
+                    switch(row) {
+                        case 1: return two/(top - bottom);
+                        default: return zero;
+                    }
+                }
+                case 2: {
+                    switch(row) {
+                        case 2: return (depth_far - depth_near)/(far - near);
+                        default: return zero;
+                    }
+                }
+                case 3: {
+                    switch(row) {
+                        case 0: return -(right + left)/(right - left);
+                        case 1: return -(top + bottom)/(top - bottom);
+                        case 2: return (depth_near*far - depth_far*near)/(far - near);
+                        case 3: return one;
+                        default: return zero;
+                    }
+                }
+                default: return kronecker_delta<value_type>(row, column);
+            }
+		}
+
+		auto row_count() const { return StaticExtent<4>{}; }
+		auto column_count() const { return StaticExtent<4>{}; }
+	};
+
+	template <typename T = NumericalTypeDefault, bool ColumnMajor = ColumnMajorDefault>
+	inline auto mat_projection_orthographic(
+        const T& left, const T& right,
+        const T& bottom, const T& top,
+        const T& near, const T& far,
+        const T& depth_near, const T& depth_far) {
+		return MatrixOrthographicProjection<T, ColumnMajor>(left, right, bottom, top, near, far, depth_near, depth_far);
+	}
+
+    template <typename T = NumericalTypeDefault, bool ColumnMajor = ColumnMajorDefault>
+	inline auto mat_projection_orthographic(
+        const T& width,
+        const T& height,
+        const T& near, const T& far,
+        const T& depth_near, const T& depth_far) {
+        T top = width/2;
+        T right = height/2;
+		return MatrixOrthographicProjection<T, ColumnMajor>(-right, right, -top, top, near, far, depth_near, depth_far);
+	}
+
+    template <typename T = NumericalTypeDefault, bool ColumnMajor = ColumnMajorDefault>
+	inline auto mat_projection_orthographic(
+        const T& width,
+        const T& height,
+        const T& depth,
+        const T& depth_near, const T& depth_far) {
+        T top = width/2;
+        T right = height/2;
+        T far = height/2;
+		return MatrixOrthographicProjection<T, ColumnMajor>(-right, right, -top, top, -far, far, depth_near, depth_far);
+	}
+
 	template <ConceptVector V, bool ColumnMajor>
 	struct MatrixScaling {
 		V coefficients;
@@ -2231,6 +2411,16 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
 	constexpr auto unary_operation(const V& v, const UnaryOperator& op) {
 		return unary_operation<Indexed, V, UnaryOperator>(v, op);
 	}
+
+    template<ConceptVector A>
+    constexpr auto abs(const A& a) {
+        return unary_operation(a, [](auto x){ using std::abs; return abs(x); });
+    }
+
+    template<ConceptVector A>
+    constexpr auto sign(const A& a) {
+        return unary_operation(a, [](auto x){ return std::signbit(x) ? -1 : 1; });
+    }
 
 	template <ConceptVector A, ConceptVector B>
 	requires is_complex_v<typename B::value_type>
@@ -2605,6 +2795,11 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
 	constexpr auto binary_operation(const A& v, const B& b, const BinaryOperator& op) {
 		return binary_operation<Indexed, A, B, BinaryOperator>(v, b, op);
 	}
+
+    template<ConceptVector A, typename B>
+    constexpr auto step(const A& a, const B& b) {
+        return binary_operation(a, b, [](auto x, auto y){ return x < y ? 0 : 1; });
+    }
 
 	template <ConceptVector A, typename B, typename C, typename TernaryOperator, bool Indexed>
 	struct VectorTernaryOperation {

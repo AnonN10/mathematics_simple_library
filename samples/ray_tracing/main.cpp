@@ -18,39 +18,8 @@ using vec4 = vec_static_t<4, float>;
 using mat3 = mat_static_t<3, 3, float>;
 using mat4 = mat_static_t<4, 4, float>;
 
-mat4 projection(float l, float r, float b, float t, float n, float f) {
-    return {
-        2*n/(r-l),	0,			(r+l)/(r-l),	0,
-        0,			2*n/(t-b),	(t+b)/(t-b),	0,
-        0,			0,			-(f+n)/(f-n),	-(2*f*n)/(f-n),
-        0,			0,			-1,				0,
-    };
-}
-
-mat4 projection(float fov, float aspectRatio, float near, float far) {
-    float tangent = tan(fov/2);
-    float top = near * tangent;
-    float right = top * aspectRatio;
-    return projection(-right, right, -top, top, near, far);
-}
-
 vec3 homogeneous_division(const vec4& in) {
     return vec3(in/in[3]);
-}
-
-template<ConceptVector A>
-constexpr auto abs(const A& a) {
-    return unary_operation(a, [](auto x){ using std::abs; return abs(x); });
-}
-
-template<ConceptVector A>
-constexpr auto sign(const A& a) {
-    return unary_operation(a, [](auto x){ return std::signbit(x) ? -1 : 1; });
-}
-
-template<ConceptVector A, typename B>
-constexpr auto step(const A& a, const B& b) {
-    return binary_operation(a, b, [](auto x, auto y){ return x < y ? 0 : 1; });
 }
 
 mat3 tangent_space_from_normal(const vec3& n) {
@@ -381,7 +350,25 @@ int main(int argc, char ** argv) {
     //rotation around x, y, z axes
     vec3 camera_rotation {0, 0, 0};
 
-    auto proj = projection(std::numbers::pi_v<float>/2.0, static_cast<float>(image_buffer.column_count().get())/image_buffer.row_count().get(), 0.01, 1.0);
+    auto rotation = quat(quat_axis_angle(vec3{0, 1, 0}, camera_rotation[1]) * quat_axis_angle(vec3{1, 0, 0}, camera_rotation[0]));
+    float inactivity_timer = -1.0f;
+    constexpr float inactivity_timer_initial = 10.0f;
+    float target_change_cooldown = 2.0f;
+    vec3 camera_target{0,10,0};
+
+    mat4 proj = mat_projection_perspective(
+        std::numbers::pi_v<float>/2.0f,
+        static_cast<float>(image_buffer.column_count().get())/image_buffer.row_count().get(),
+        0.01f, 1.0f,
+        0.0f, 1.0f
+    );
+    /*float aspect = static_cast<float>(image_buffer.column_count().get())/image_buffer.row_count().get();
+    mat4 proj = mat_projection_orthographic(
+        -10.0f*aspect, 10.0f*aspect,
+        -10.0f, 10.0f,
+        -10.0f, 10.0f,
+        0.0f, 1.0f
+    );*/
 
     Timer timer;
     float time_elapsed = timer.elapsed();
@@ -453,11 +440,44 @@ int main(int argc, char ** argv) {
 			}
 		}
 
+        //automatic camera
+        if(inactivity_timer < 0.0f) {
+            if(target_change_cooldown < 0.0f) {
+                camera_target = vec3{std::sin(time_elapsed*1239541.0f), std::sin(time_elapsed*164341.0f), std::sin(time_elapsed*1262121.0f)} * 15.0f;
+                camera_target[1] = std::max(camera_target[1] * 0.2f, 0.0f);
+                target_change_cooldown = 2.0f;
+            } else target_change_cooldown -= time_delta;
+
+            static auto camera_velocity = vec3{0, 0, 0};
+            camera_velocity = lerp(normalize(camera_target - camera_position) * 5.0f, camera_velocity, std::pow(1.0f-0.7f, time_delta));
+            camera_position += camera_velocity * time_delta;
+            
+            decltype(rotation) rotto = slerp_flip(quat_look_rotation(normalize(vec3{0, 0, 0} - camera_position), vec3{0, 1, 0}), rotation);
+            rotation = slerp(rotto, rotation, std::pow(1.0f-0.8f, time_delta));
+
+            //avoid obstacles
+            [[maybe_unused]] Material* ptr_hit_mat = nullptr;
+            auto ires = world.TraceClosest(camera_position, camera_velocity, 0.0f, std::numeric_limits<float>::max(), ptr_hit_mat);
+            if(ires.hit && length(ires.t * camera_velocity) < 1.0f) {
+                camera_velocity += std::max(100.0f - 100.0f*length(ires.t * camera_velocity), 0.0f) * ires.normal * time_delta;
+            }
+
+            //perform decomposition so we could resume manual control from here
+            vec3 rotated_vec = rotation * vec3{0, 0, 1};
+            vec3 xz_proj = vector_rejection(rotated_vec, vec3{0, 1, 0});
+            camera_rotation[0] = std::acos(dot(vec3{0, 1, 0}, rotated_vec)) - std::numbers::pi_v<float> / 2;
+            camera_rotation[1] = std::atan2(xz_proj[0], xz_proj[2]);
+        } else {
+            inactivity_timer -= time_delta;
+            rotation = quat(quat_axis_angle(vec3{0, 1, 0}, camera_rotation[1]) * quat_axis_angle(vec3{1, 0, 0}, camera_rotation[0]));
+        }
+
         //handle mouse controls and compute orientation
         int mouse_delta_x = 0, mouse_delta_y = 0;
         SDL_GetRelativeMouseState(&mouse_delta_x, &mouse_delta_y);
         if(SDL_GetMouseState(nullptr, nullptr) & SDL_BUTTON_LMASK) {
-            camera_rotation += vec3{static_cast<float>(-mouse_delta_y), static_cast<float>(-mouse_delta_x), 0} * 0.005;
+            camera_rotation += vec3{static_cast<float>(mouse_delta_y), static_cast<float>(mouse_delta_x), 0} * 0.005;
+            inactivity_timer = inactivity_timer_initial;
         }
         auto rotation = quat(quat_axis_angle(vec3{0, 1, 0}, camera_rotation[1]) * quat_axis_angle(vec3{1, 0, 0}, camera_rotation[0]));
 
@@ -483,10 +503,10 @@ int main(int argc, char ** argv) {
 		if (keystate[SDL_SCANCODE_E]) {
 			camera_position += rotation * vec3{0, speed, 0};
 		}
-		if (keystate[SDL_SCANCODE_W]) {
+		if (keystate[SDL_SCANCODE_S]) {
 			camera_position += rotation * vec3{0, 0, -speed};
 		}
-		if (keystate[SDL_SCANCODE_S]) {
+		if (keystate[SDL_SCANCODE_W]) {
 			camera_position += rotation * vec3{0, 0, speed};
 		}
 
@@ -506,10 +526,7 @@ int main(int argc, char ** argv) {
         const int threads_per_dim = std::sqrt(std::thread::hardware_concurrency());
         const auto tile_size = image_size/threads_per_dim;
         //calculate horizontal and vertical tile count
-		ivec2 tile_count {
-            static_cast<int>(image_size[0] / tile_size[0] + (image_size[0] % tile_size[0] > 0)),
-            static_cast<int>(image_size[1] / tile_size[1] + (image_size[1] % tile_size[1] > 0))
-        };
+        ivec2 tile_count = image_size/tile_size + binary_operation_component_wise(image_size, tile_size, [](auto a, auto b){return a % b > 0;});
         //iterate each tile
 		for (int i = 0; i < tile_count[1]; ++i) {
 			for (int j = 0; j < tile_count[0]; ++j) {
@@ -526,7 +543,7 @@ int main(int argc, char ** argv) {
                             auto image_pos = tile_origin + tile_pos;
                             auto uv = vec2(vec<float>(image_pos)/image_size); uv[1] = 1-uv[1];
                             auto ray_origin = vec(homogeneous_division(
-                                inv_viewproj * join(uv*2-1, vec2{-1, 1})
+                                inv_viewproj * join(uv*2-1, vec2{0, 1})
                             ));
                             auto ray_direction = vec(normalize(homogeneous_division(
                                 inv_viewproj * join(uv*2-1, vec2{1, 1})
