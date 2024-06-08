@@ -1062,6 +1062,91 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
 		return mat_procedural<ValueGenerator, ColumnMajor>(rows, columns, op);
 	}
 
+    template <ConceptVector... Vectors>
+	struct ColumnVectorMatrix {
+		std::array<std::common_type_t<Vectors...>, sizeof...(Vectors)> vectors;
+
+		constexpr static bool column_major = true;
+
+		constexpr ColumnVectorMatrix(Vectors... vs) {
+            vectors = {vs...};
+		}
+
+		constexpr auto ref() const { return *this; }
+
+		constexpr auto operator[] (IndexType row, IndexType column) const {
+			return vectors[column][row];
+		}
+
+		using value_type = decltype(std::declval<ColumnVectorMatrix<Vectors...>>()[0,0]);
+
+		constexpr auto row_count() const { return vectors[0].size(); }
+		constexpr auto column_count() const { return StaticExtent<sizeof...(Vectors)>{}; }
+	};
+
+	template <ConceptVector... Vectors>
+    constexpr auto mat_columns(const Vectors&... vs) {
+		return ColumnVectorMatrix<Vectors...>(vs...);
+	}
+
+	template <ConceptVector... Vectors>
+    constexpr auto mat(Vectors... vs) {
+		return mat(mat_columns(vs...));
+	}
+
+	template <ConceptMatrix M, ConceptExtent ExtR, ConceptExtent ExtC, typename ValueGenerator>
+	struct MatrixExtended {
+        M matrix;
+    	ValueGenerator f;
+		ExtR rows;
+		ExtC columns;
+
+		using value_type = typename M::value_type;
+		constexpr static bool column_major = M::column_major;
+
+		constexpr MatrixExtended(const M& matrix, const ValueGenerator& f = {}, const ExtR& rows = {}, const ExtC& columns = {})
+			: matrix(matrix), f(f), rows(rows), columns(columns)
+		{}
+
+		constexpr auto ref() const { return *this; }
+
+		constexpr auto operator[] (IndexType row, IndexType column) const {
+            if(row < matrix.row_count().get() && column < matrix.column_count().get())
+                return matrix[row, column];
+			return f(row, column, rows.get(), columns.get());
+		}
+
+		constexpr auto row_count() const { return rows; }
+		constexpr auto column_count() const { return columns; }
+	};
+
+	template <IndexType Rows, IndexType Columns, ConceptMatrix M, typename ValueGenerator>
+	constexpr auto extend(const M& matrix, const ValueGenerator& op) {
+		return MatrixExtended<decltype(matrix.ref()), StaticExtent<Rows>, StaticExtent<Columns>, ValueGenerator> { matrix.ref(), op };
+	}
+	template <typename ValueGenerator, ConceptMatrix M>
+	constexpr auto extend(const M& matrix, IndexType rows, IndexType columns, const ValueGenerator& op) {
+		return MatrixExtended<decltype(matrix.ref()), DynamicExtent, DynamicExtent, ValueGenerator> { matrix.ref(), op, rows, columns };
+	}
+
+	template <IndexType Rows, IndexType Columns, ConceptMatrix M>
+	constexpr auto extend_identity(const M& matrix) {
+		return extend<Rows, Columns>(matrix, [](auto i, auto j, auto, auto){ return kronecker_delta<typename M::value_type>(i, j); });
+	}
+	template <ConceptMatrix M>
+	constexpr auto extend_identity(const M& matrix, IndexType rows, IndexType columns) {
+		return extend(matrix, rows, columns, [](auto i, auto j, auto, auto){ return kronecker_delta<typename M::value_type>(i, j); });
+	}
+
+	template <IndexType Rows, IndexType Columns, ConceptMatrix M>
+	constexpr auto extend_constant(const M& matrix, const typename M::value_type& value) {
+		return extend<Rows, Columns>(matrix, [&value](auto, auto, auto, auto){ return value; });
+	}
+	template <ConceptMatrix M>
+	constexpr auto extend_constant(const M& matrix, IndexType rows, IndexType columns, const typename M::value_type& value) {
+		return extend(matrix, rows, columns, [&value](auto, auto, auto, auto){ return value; });
+	}
+
 	template <ConceptMatrix L, ConceptMatrix R>
 	//requires (std::same_as<typename L::value_type, typename R::value_type>)
 	struct AugmentedMatrix {
@@ -1506,6 +1591,15 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
 	constexpr auto inverse_gauss_jordan(const M& m) {
         auto r = rref(augment(m, mat_identity(m.row_count().get(), m.column_count().get())));
 		return split_right(r, m.column_count().get());
+	}
+
+    template <ConceptMatrix BasisSource, ConceptMatrix BasisDestination>
+	constexpr auto mat_change_of_basis(const BasisSource& basis_src, const BasisDestination& basis_dest) {
+		return basis_dest * inverse(basis_src);
+	}
+    template <ConceptMatrix BasisSource, ConceptMatrix BasisDestination>
+	constexpr auto mat_transition(const BasisSource& basis_src, const BasisDestination& basis_dest) {
+		return mat_change_of_basis(basis_src, basis_dest);
 	}
 	
 	template <ConceptMatrix M, ConceptExtent E>

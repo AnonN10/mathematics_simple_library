@@ -28,7 +28,7 @@ mat3 tangent_space_from_normal(const vec3& n) {
     float b = n[0] * n[1] * a;
     vec3 t = vec3{1.0f + s * n[0]* n[0] * a, s * b, -s * n[0]};
     vec3 bt = vec3{b, s + n[1] * n[1] * a, -n[1]};
-    return join(join(as_column(t), as_column(n)), as_column(bt));
+    return mat_columns(t, n, bt);
 }
 
 float checker_pattern(const vec2& uv, float scale) {

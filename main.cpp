@@ -218,6 +218,26 @@ int main() {
 	PRINT_EXEC(print(transform));
 	PRINT_EXEC(transform_dynamic = m_translation * m_rotation * m_scaling);
 	PRINT_EXEC(print(transform_dynamic));
+	//left handed +X right +Y up +Z forward to OpenGL's right handed +X right +Y up -Z forward
+	PRINT_EXEC(using mat3 = mat_static_t<3,3,float>);
+	PRINT_EXEC(using vec3 = vec_static_t<3,float>);
+	PRINT_EXEC(vec3 src_right{1, 0, 0});
+	PRINT_EXEC(vec3 src_up{0, 1, 0});
+	PRINT_EXEC(vec3 src_fwd{0, 0, 1});
+	PRINT_EXEC(vec3 ogl_right{1, 0, 0});
+	PRINT_EXEC(vec3 ogl_up{0, 1, 0});
+	PRINT_EXEC(vec3 ogl_fwd{0, 0, -1});
+	PRINT_EXEC(mat3 m_basis_opengl_3x3 = mat_change_of_basis(mat_columns(src_right, src_up, src_fwd), mat_columns(ogl_right, ogl_up, ogl_fwd)));
+	PRINT_EXEC(mat_static_t<4,4,float> m_basis_opengl = extend_identity<4,4>(m_basis_opengl_3x3));
+	PRINT_EXEC(print(m_basis_opengl));
+	PRINT_EXEC(mat_static_t<4,4,float> m_perspective = mat_projection_perspective(std::numbers::pi_v<float>/2, 1.0f, 0.1f, 1.0f, -1.0f, 1.0f));
+	PRINT_EXEC(print(m_perspective));
+	PRINT_EXEC(mat_static_t<4,4,float> m_perspective_opengl = m_basis_opengl * m_perspective);
+	PRINT_EXEC(print(m_perspective_opengl));
+	PRINT_EXEC(mat_static_t<4,4,float> m_ortho = mat_projection_orthographic(-1.0f, 1.0f, -1.0f, 1.0f, 0.1f, 1.0f, -1.0f, 1.0f));
+	PRINT_EXEC(print(m_ortho));
+	PRINT_EXEC(mat_static_t<4,4,float> m_ortho_opengl = m_basis_opengl * m_ortho);
+	PRINT_EXEC(print(m_ortho_opengl));
 	std::cout << std::endl;
 
 	std::cout << "## rectangular matrix partition access (block matrices) ##" << std::endl;
