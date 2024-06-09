@@ -4,6 +4,12 @@
 
 Use CMake to build projects associated with each subdirectory from within the root directory project, most samples do not use any dependencies, so building them with `cmake-tools` extension in Visual Studio Code should take no additional efforts other than configuration, otherwise see a list of required dependencies under corresponding sample section.
 
+## Index
+1. [Lights Out solver](#lights-out-solver)
+2. [Blue noise generator](#blue-noise-generator)
+3. [Jump Flooding algorithm](#jump-flooding-algorithm)
+4. [Ray Tracing](#ray-tracing)
+
 ## Lights Out solver
 
 Solver for the game [Lights Out](https://en.wikipedia.org/wiki/Lights_Out_(game)).
