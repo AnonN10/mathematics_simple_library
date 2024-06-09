@@ -238,6 +238,13 @@ int main() {
 	PRINT_EXEC(print(m_ortho));
 	PRINT_EXEC(mat_static_t<4,4,float> m_ortho_opengl = m_basis_opengl * m_ortho);
 	PRINT_EXEC(print(m_ortho_opengl));
+	PRINT_EXEC(vec3 a_right{1, 0, 0});
+	PRINT_EXEC(vec3 a_up{0, 0, 1});
+	PRINT_EXEC(vec3 a_fwd{0, 1, 0});
+	PRINT_EXEC(vec3 b_right{1, 0, 0});
+	PRINT_EXEC(vec3 b_up{0, -1, 0});
+	PRINT_EXEC(vec3 b_fwd{0, 0, -1});
+	PRINT_EXEC(print(extend_identity<4,4>(mat_change_of_basis(mat_columns(a_right, a_up, a_fwd), mat_columns(b_right, b_up, b_fwd)))));
 	std::cout << std::endl;
 
 	std::cout << "## rectangular matrix partition access (block matrices) ##" << std::endl;
