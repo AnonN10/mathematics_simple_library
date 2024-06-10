@@ -1,4 +1,3 @@
+## Mathematics Truly-Simple Library
 
-don't care about performance, care about maths, convention consistency, generality and readability
-
-use cmake to build the sample located in main.cpp, or run cmd file to build on windows (also with cmake)
+You probably don't want to use this unless you want to compare it's naive implementation to something else.
