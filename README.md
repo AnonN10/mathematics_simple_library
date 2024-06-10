@@ -1,4 +1,5 @@
+## Mathematics Simple Library
 
-don't care about performance, care about maths, convention consistency, generality and readability
+A header-only mathematics library with focus on convention consistency, extensibility and readability while leaving micro-optimizations to the compiler.
 
-use cmake to build the sample located in main.cpp, or run cmd file to build on windows (also with cmake)
+It does what you'd expect from an average utility library, to get a feeling what it's like to use it, see [main.cpp](/main.cpp). For concrete examples of use within applications, see [samples](/samples).

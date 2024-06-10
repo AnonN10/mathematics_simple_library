@@ -1,5 +1,6 @@
 #include <iostream>
 #include <iomanip>
+#include <cstdlib>
 
 #include "mathematics_simple_library.hpp"
 
@@ -51,19 +52,10 @@ std::ostream &operator<<(std::ostream &os, GF2 const &m) {
     return os << m.value;
 }
 
-template<IndexType M, IndexType N, typename Scalar, bool use_heap>
-void print_matrix(const Matrix<M, N, Scalar, use_heap>& mat, std::streamsize spacing_width = 12) {
-	for(IndexType m = 0; m < M; ++m) {
-		for(IndexType n = 0; n < N; ++n)
-			std::cout << std::setw(spacing_width) << mat[m, n] << ",";
-		std::cout << std::endl;
-	}
-}
-
 int main() {
 	std::cout << std::fixed;
 
-	Matrix<5,5,GF2> board({
+	auto board = mat<5,5,GF2>({
 		GF2(0), GF2(1), GF2(0), GF2(1), GF2(1),
 		GF2(1), GF2(1), GF2(0), GF2(0), GF2(0),
 		GF2(0), GF2(1), GF2(1), GF2(1), GF2(1),
@@ -74,38 +66,31 @@ int main() {
 	std::vector<GF2> A_flat;
 	for(int m = 0; m < 5; ++m) {
 		for(int n = 0; n < 5; ++n) {
-			Matrix<5,5,GF2> btnpress;
-			btnpress.zero();
+			mat_static_t<5,5,GF2> btnpress = mat_zero<5,5,GF2>();
 			btnpress[m, n] = GF2(1);
 			if(m > 0) btnpress[m-1, n] = GF2(1);
 			if(m < 5-1) btnpress[m+1, n] = GF2(1);
 			if(n > 0) btnpress[m, n-1] = GF2(1);
 			if(n < 5-1) btnpress[m, n+1] = GF2(1);
-			auto btnpress_flat = btnpress.get_v();
-			A_flat.insert(A_flat.end(), btnpress_flat.begin(), btnpress_flat.end());
+			A_flat.insert(A_flat.end(), btnpress.data.begin(), btnpress.data.end());
 		}
 	}
-	//construct row matrix
-	Matrix<5*5,5*5,GF2,true> A_T;
-	A_T.set(A_flat);
-	//transpose such that each board state corresponds to a column in matrix A
-	auto A = A_T.transpose();
+	//construct row matrix and transpose such that each board state corresponds to a column in matrix A
+	auto A = transpose(mat_ref(A_flat, 5*5, 5*5));
 	//turn initial board state to column vector
-	Vector<5*5,GF2,true> b;
-	b.set(board.get_v());
+	auto b = as_column(vec_ref(board.data));
 	//augment
-	auto M = A.augment(b);
+	mat_dynamic_t<GF2> M = augment(A, b);
 	//solve
-	M = M.rref();
+	M = rref(M);
 	//extract solution and turn back to 5x5 matrix
-	Matrix<5,5,GF2> solution;
-	solution.set(M.column(25).get_v());
+	auto solution = as_matrix(column_of(M, 25), 5);
 
 	//print initial board state and its solution
 	std::cout << "board:" << std::endl;
-	print_matrix(board, 2);
+	print(board, std::cout, 2);
 	std::cout << "solution:" << std::endl;
-	print_matrix(solution, 2);
+	print(solution, std::cout, 2);
 	
-    return 0;
+    return EXIT_SUCCESS;
 }

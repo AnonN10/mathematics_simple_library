@@ -1,0 +1,4 @@
+[submodule "contrib/SDL"]
+	path = samples/ray_tracing/contrib/SDL
+	url = https://github.com/libsdl-org/SDL
+	branch = SDL2
