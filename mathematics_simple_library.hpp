@@ -440,6 +440,12 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
         template <ConceptVector V>
         VectorObjectStatic(const V& v) { *this = v; }
 
+		template <typename... Values>
+		requires (sizeof...(Values) == Size)
+		VectorObjectStatic(Values... values) {
+            data = {static_cast<T>(values)...};
+		}
+
         template <typename U>
         using RefType = VectorReference<U, StaticExtent<Size>>;
 
