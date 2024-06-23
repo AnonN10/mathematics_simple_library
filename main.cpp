@@ -103,6 +103,7 @@ int main() {
 	std::cout << std::endl;
 
 	std::cout << "## vector or matrix object (embedded storage: std::array or std::vector) ##" << std::endl;
+	PRINT_EXEC(print(vec_static_t<4, float>(1, 2, 3, 4)));
 	PRINT_EXEC(auto vobj_static = vec<2>({1, 2, 3, 4}));
 	PRINT_EXEC(auto vobj_dynamic = vec<float>({1, 2, 3, 4}));
 	PRINT_EXEC(print(vobj_static));
