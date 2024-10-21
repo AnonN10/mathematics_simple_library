@@ -68,8 +68,6 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
     constexpr Conventions::RayDirection RayDirectionDefault = MATHEMATICS_SIMPLE_LIBRARY_DEFAULT_CONVENTION_RAY_DIRECTION;
     constexpr bool ColumnMajorDefault = MATHEMATICS_SIMPLE_LIBRARY_DEFAULT_COLUMN_MAJOR;
 
-    struct none_t {};
-
     template <bool> struct is_boolean_t {};
 
     template <typename T>
@@ -513,15 +511,15 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
         template <typename U>
         using RefType = VectorReference<U, StaticExtent<Size>>;
 
-        auto ref() const { return RefType<const T> { std::data(data) }; }
+        constexpr auto ref() const { return RefType<const T> { std::data(data) }; }
         auto ref() { return RefType<T> { std::data(data) }; }
 
         template <ConceptVector V>
         constexpr VectorObjectStatic& operator= (const V& v) { ref() = v; return *this; }
 
         auto& operator[] (IndexType element) { return ref()[element]; }
-        const auto& operator[] (IndexType element) const { return ref()[element]; }
-        auto size() const { return ref().size(); }
+        constexpr auto& operator[] (IndexType element) const { return ref()[element]; }
+        constexpr auto size() const { return ref().size(); }
     };
 
     template <typename T>
@@ -915,10 +913,16 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
         template <ConceptMatrix M>
         constexpr MatrixObjectStatic(const M& m) { *this = m; }
 
+        template <typename... Values>
+        requires (sizeof...(Values) == Rows*Columns)
+        constexpr MatrixObjectStatic(Values... values) {
+            data = {static_cast<T>(values)...};
+        }
+
         template <typename U>
         using RefType = MatrixReference<U, StaticExtent<Rows>, StaticExtent<Columns>, ColumnMajor>;
 
-        auto ref() const { return RefType<const T> { std::data(data) }; }
+        constexpr auto ref() const { return RefType<const T> { std::data(data) }; }
         auto ref() { return RefType<T> { std::data(data) }; }
 
         template <ConceptMatrix M>
@@ -3187,11 +3191,12 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
     constexpr auto spherical_linear_interpolation(const A& a, const B& b, const T& t) {
         using std::sin;
         using std::acos;
-        auto omega = acos(inner_product_euclidean(a, b));
-        bool reduce_to_lerp = !(omega > std::numeric_limits<T>::epsilon());
+        auto omega = acos(inner_product_euclidean(a, b)/(length(a)*length(b)));
+        auto sin_omega = sin(omega);
+        bool reduce_to_lerp = !(sin_omega > std::numeric_limits<T>::epsilon());
         T t_a = reduce_to_lerp? T{1} - t : sin((T{1} - t)*omega);
         T t_b = reduce_to_lerp? t : sin(t*omega);
-        T denom = reduce_to_lerp? T{1} : sin(omega);
+        T denom = reduce_to_lerp? T{1} : sin_omega;
         return (a*t_a + b*t_b)/denom;
     }
     template <ConceptVector A, ConceptVector B, typename T>
