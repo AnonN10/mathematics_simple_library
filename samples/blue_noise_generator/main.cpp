@@ -1,8 +1,5 @@
 #include <iostream>
-#include <iomanip>
-
 #include <cstdlib>
-#include <random>
 
 #include "mathematics_simple_library.hpp"
 
@@ -12,14 +9,6 @@
 #include "stb_image_write.h"
 
 using namespace Maths;
-
-template<typename T>
-T random_range(T range_from, T range_to) {
-    std::random_device                  rand_dev;
-    std::mt19937                        generator(rand_dev());
-    std::uniform_real_distribution<T>   distr(range_from, range_to);
-    return distr(generator);
-}
 
 int main() {
 	constexpr int matdim = 512;
@@ -32,7 +21,7 @@ int main() {
 	std::cout << "Generating white noise matrix..." << std::endl;
 	mat_dynamic_t<std::complex<complex_value_type>> mat = mat_procedural(
 		matdim, matdim,
-		[](auto, auto, auto, auto) { return random_range(zero, one); }
+		[](auto, auto, auto, auto) { return Maths::random_range(zero, one); }
 	);
 	std::cout << "Generating filter matrix..." << std::endl;
 	mat_dynamic_t<std::complex<complex_value_type>> mat_filter = mat_procedural(

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iostream>
+#include <iomanip>
 #include <cassert>
 #include <cstdlib>
 #include <cstdint>
@@ -19,6 +20,7 @@
 #include <initializer_list>
 #include <concepts>
 #include <utility>
+#include <random>
 
 #ifndef MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE
 #define MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE Maths
@@ -314,6 +316,17 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
     template <ConceptMatrix M>
     constexpr auto column_count_static() { return decltype(std::declval<M>().column_count())::get(); }
 
+    template<typename T>
+    T random_range(T range_from, T range_to) {
+        std::random_device                     rand_dev;
+        std::mt19937                           generator(rand_dev());
+        std::conditional_t<
+            std::is_integral_v<T>,
+            std::uniform_int_distribution<T>,
+            std::uniform_real_distribution<T>> distr(range_from, range_to);
+        return distr(generator);
+    }
+
     //NOTE: may return negative zero
     template <typename T>
     requires (!ConceptVector<T> && !ConceptMatrix<T>)
@@ -574,9 +587,14 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
         auto size() const { return ref().size(); }
     };
 
-    template <typename... Values>
+    template <typename T, typename... Values>
     constexpr auto vec(Values... values) {
-        return VectorObjectStatic<std::common_type_t<Values...>, sizeof...(Values)>(values...);
+        return VectorObjectStatic<T, sizeof...(Values)>(static_cast<T>(values)...);
+    }
+
+    template <typename... Values>
+    constexpr auto vec(std::common_type_t<Values...> v, Values... values) {
+        return VectorObjectStatic<std::common_type_t<Values...>, 1+sizeof...(Values)>(v, values...);
     }
 
     template <IndexType Size, ConceptContainer T>
@@ -587,6 +605,11 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
     template <IndexType Size, ConceptVector V>
     inline auto vec(const V& v) {
         return VectorObjectStatic<std::remove_const_t<typename V::value_type>, Size>(v);
+    }
+
+    template <IndexType Size, ConceptVector... Values>
+    inline auto vec(Values... values) {
+        return VectorObjectStatic<std::common_type_t<Values...>, Size>(values...);
     }
 
     template <typename T>
@@ -3264,10 +3287,12 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
     using quat_t = Quaternion<vec_static_t<4, T>>;
 
     template <ConceptVector V, typename T>
+    requires (!std::is_integral_v<typename V::value_type> || !std::is_integral_v<T>)
     constexpr auto quat_axis_angle(const V& axis, T angle) {
         using std::sin;
         using std::cos;
-        T half_angle = angle * T{0.5};
+        using ret_t = std::conditional_t<std::is_integral_v<T>, typename V::value_type, T>;
+        ret_t half_angle = angle * ret_t{0.5};
         auto sine = sin(half_angle);
         return quat(vec_ref({cos(half_angle), axis[0] * sine, axis[1] * sine, axis[2] * sine}));
     }
@@ -3516,6 +3541,227 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
         return as_quaternion(join(join(as_column(right), as_column(up_orthonormal)), as_column(forward)));
     }
 
+    // A C++ adaptation of Euler angles conversions by Ken Shoemake, 1993
+    enum class EulerAnglesFrame : int {
+        Static = 0,
+        Rotating = 1,
+        Fixed = Static,
+        Mobile = Rotating
+    };
+
+    enum class EulerAnglesParity : int {
+        Even = 0,
+        Odd = 1
+    };
+
+    enum class EulerAnglesRepetition : int {
+        No = 0,
+        Yes = 1
+    };
+
+    enum class EulerAnglesAxis : int {
+        X = 0,
+        Y = 1,
+        Z = 2
+    };
+
+    constexpr inline auto pack_euler_angles_order(
+        EulerAnglesAxis inner_axis,
+        EulerAnglesParity parity,
+        EulerAnglesRepetition repetition,
+        EulerAnglesFrame frame
+    ) {
+        auto order = std::to_underlying(inner_axis);
+        order <<= 1;
+        order += std::to_underlying(parity);
+        order <<= 1;
+        order += std::to_underlying(repetition);
+        order <<= 1;
+        order += std::to_underlying(frame);
+        return static_cast<int>(order);
+    }
+
+    enum class EulerAnglesOrder : int {
+        XYZs = pack_euler_angles_order(EulerAnglesAxis::X, EulerAnglesParity::Even, EulerAnglesRepetition::No, EulerAnglesFrame::Static),
+        XYXs = pack_euler_angles_order(EulerAnglesAxis::X, EulerAnglesParity::Even, EulerAnglesRepetition::Yes, EulerAnglesFrame::Static),
+        XZYs = pack_euler_angles_order(EulerAnglesAxis::X, EulerAnglesParity::Odd, EulerAnglesRepetition::No, EulerAnglesFrame::Static),
+        XZXs = pack_euler_angles_order(EulerAnglesAxis::X, EulerAnglesParity::Odd, EulerAnglesRepetition::Yes, EulerAnglesFrame::Static),
+        YZXs = pack_euler_angles_order(EulerAnglesAxis::Y, EulerAnglesParity::Even, EulerAnglesRepetition::No, EulerAnglesFrame::Static),
+        YZYs = pack_euler_angles_order(EulerAnglesAxis::Y, EulerAnglesParity::Even, EulerAnglesRepetition::Yes, EulerAnglesFrame::Static),
+        YXZs = pack_euler_angles_order(EulerAnglesAxis::Y, EulerAnglesParity::Odd, EulerAnglesRepetition::No, EulerAnglesFrame::Static),
+        YXYs = pack_euler_angles_order(EulerAnglesAxis::Y, EulerAnglesParity::Odd, EulerAnglesRepetition::Yes, EulerAnglesFrame::Static),
+        ZXYs = pack_euler_angles_order(EulerAnglesAxis::Z, EulerAnglesParity::Even, EulerAnglesRepetition::No, EulerAnglesFrame::Static),
+        ZXZs = pack_euler_angles_order(EulerAnglesAxis::Z, EulerAnglesParity::Even, EulerAnglesRepetition::Yes, EulerAnglesFrame::Static),
+        ZYXs = pack_euler_angles_order(EulerAnglesAxis::Z, EulerAnglesParity::Odd, EulerAnglesRepetition::No, EulerAnglesFrame::Static),
+        ZYZs = pack_euler_angles_order(EulerAnglesAxis::Z, EulerAnglesParity::Odd, EulerAnglesRepetition::Yes, EulerAnglesFrame::Static),
+        ZYXr = pack_euler_angles_order(EulerAnglesAxis::X, EulerAnglesParity::Even, EulerAnglesRepetition::No, EulerAnglesFrame::Rotating),
+        XYXr = pack_euler_angles_order(EulerAnglesAxis::X, EulerAnglesParity::Even, EulerAnglesRepetition::Yes, EulerAnglesFrame::Rotating),
+        YZXr = pack_euler_angles_order(EulerAnglesAxis::X, EulerAnglesParity::Odd, EulerAnglesRepetition::No, EulerAnglesFrame::Rotating),
+        XZXr = pack_euler_angles_order(EulerAnglesAxis::X, EulerAnglesParity::Odd, EulerAnglesRepetition::Yes, EulerAnglesFrame::Rotating),
+        XZYr = pack_euler_angles_order(EulerAnglesAxis::Y, EulerAnglesParity::Even, EulerAnglesRepetition::No, EulerAnglesFrame::Rotating),
+        YZYr = pack_euler_angles_order(EulerAnglesAxis::Y, EulerAnglesParity::Even, EulerAnglesRepetition::Yes, EulerAnglesFrame::Rotating),
+        ZXYr = pack_euler_angles_order(EulerAnglesAxis::Y, EulerAnglesParity::Odd, EulerAnglesRepetition::No, EulerAnglesFrame::Rotating),
+        YXYr = pack_euler_angles_order(EulerAnglesAxis::Y, EulerAnglesParity::Odd, EulerAnglesRepetition::Yes, EulerAnglesFrame::Rotating),
+        YXZr = pack_euler_angles_order(EulerAnglesAxis::Z, EulerAnglesParity::Even, EulerAnglesRepetition::No, EulerAnglesFrame::Rotating),
+        ZXZr = pack_euler_angles_order(EulerAnglesAxis::Z, EulerAnglesParity::Even, EulerAnglesRepetition::Yes, EulerAnglesFrame::Rotating),
+        XYZr = pack_euler_angles_order(EulerAnglesAxis::Z, EulerAnglesParity::Odd, EulerAnglesRepetition::No, EulerAnglesFrame::Rotating),
+        ZYZr = pack_euler_angles_order(EulerAnglesAxis::Z, EulerAnglesParity::Odd, EulerAnglesRepetition::Yes, EulerAnglesFrame::Rotating)
+    };
+
+    template <EulerAnglesOrder Order>
+    constexpr auto unpack_euler_angles_order() {
+        constexpr int eul_safe[] = {0, 1, 2, 0};
+        constexpr int eul_next[] = {1, 2, 0, 1};
+        constexpr auto o = static_cast<unsigned>(Order);
+        constexpr auto frame = static_cast<EulerAnglesFrame>(o&1);
+        constexpr auto repetition = static_cast<EulerAnglesRepetition>((o >> 1)&1);
+        constexpr auto parity = static_cast<EulerAnglesParity>((o >> 2)&1);
+        constexpr int i = eul_safe[(o >> 3)&3];
+        constexpr int j = eul_next[i + std::to_underlying(parity)];
+        constexpr int k = eul_next[i + 1 - std::to_underlying(parity)];
+        constexpr int h = []{if constexpr (repetition == EulerAnglesRepetition::Yes) return k; else return i;}();
+        return std::make_tuple(parity, repetition, frame, i, j, k, h);
+    }
+
+    constexpr auto unpack_euler_angles_order(
+        EulerAnglesOrder order
+    ) {
+        constexpr int eul_safe[] = {0, 1, 2, 0};
+        constexpr int eul_next[] = {1, 2, 0, 1};
+        auto o = static_cast<unsigned>(order);
+        auto frame = static_cast<EulerAnglesFrame>(o&1);
+        o >>= 1;
+        auto repetition = static_cast<EulerAnglesRepetition>(o&1);
+        o >>= 1;
+        auto parity = static_cast<EulerAnglesParity>(o&1);
+        o >>= 1;
+        int i = eul_safe[o&3];
+        int j = eul_next[i + std::to_underlying(parity)];
+        int k = eul_next[i + 1 - std::to_underlying(parity)];
+        int h = repetition == EulerAnglesRepetition::Yes ? k : i;
+        return std::make_tuple(parity, repetition, frame, i, j, k, h);
+    }
+
+    // Convert matrix to Euler angles (in radians).
+    template <ConceptMatrix M>
+    inline auto euler_angles(M matrix, EulerAnglesOrder order) {
+        using std::sqrt;
+        using std::atan2;
+
+        vec_static_t<3, typename M::value_type> angles;
+        auto [parity, repetition, frame, i, j, k, h] = unpack_euler_angles_order(order);
+
+        if (repetition == EulerAnglesRepetition::Yes) {
+            typename M::value_type sy = sqrt(matrix[i, j]*matrix[i, j] + matrix[i, k]*matrix[i, k]);
+            if (sy > 16*std::numeric_limits<typename M::value_type>::epsilon()) {
+                angles[0] = atan2(matrix[i, j], matrix[i, k]);
+                angles[1] = atan2(sy, matrix[i, i]);
+                angles[2] = atan2(matrix[j, i], -matrix[k, i]);
+            } else {
+                angles[0] = atan2(-matrix[j, k], matrix[j, j]);
+                angles[1] = atan2(sy, matrix[i, i]);
+                angles[2] = 0;
+            }
+        } else {
+            typename M::value_type cy = sqrt(matrix[i, i]*matrix[i, i] + matrix[j, i]*matrix[j, i]);
+            if (cy > 16*std::numeric_limits<typename M::value_type>::epsilon()) {
+                angles[0] = atan2(matrix[k, j], matrix[k, k]);
+                angles[1] = atan2(-matrix[k, i], cy);
+                angles[2] = atan2(matrix[j, i], matrix[i, i]);
+            } else {
+                angles[0] = atan2(-matrix[j, k], matrix[j, j]);
+                angles[1] = atan2(-matrix[k, i], cy);
+                angles[2] = 0;
+            }
+        }
+        if (parity == EulerAnglesParity::Odd) {
+            angles[0] = -angles[0];
+            angles[1] = -angles[1];
+            angles[2] = -angles[2];
+        }
+        if (frame == EulerAnglesFrame::Rotating) {
+            std::swap(angles[0], angles[2]);
+        }
+        return angles;
+    }
+
+    template <ConceptQuaternion Q>
+    inline auto euler_angles(Q quaternion, EulerAnglesOrder order) {
+        return euler_angles(as_matrix(quaternion), order);
+    }
+
+    template <EulerAnglesOrder Order, ConceptVector V>
+    inline auto quat_euler_angles(const V& angles) {
+        constexpr auto ord_tup = unpack_euler_angles_order<Order>();
+        constexpr auto frame = std::get<2>(ord_tup);
+        constexpr auto
+            i = std::get<3>(ord_tup),
+            j = std::get<4>(ord_tup),
+            k = std::get<5>(ord_tup);
+
+        auto Q0 = quat_axis_angle(
+            vec<typename V::value_type>(
+                [&]{if constexpr (i == std::to_underlying(EulerAnglesAxis::X)) return 1; else return 0;}(),
+                [&]{if constexpr (i == std::to_underlying(EulerAnglesAxis::Y)) return 1; else return 0;}(),
+                [&]{if constexpr (i == std::to_underlying(EulerAnglesAxis::Z)) return 1; else return 0;}()
+            ),
+            [&]{if constexpr(frame == EulerAnglesFrame::Static) return angles[0]; else return angles[2];}()
+        );
+        auto Q1 = quat_axis_angle(
+            vec<typename V::value_type>(
+                [&]{if constexpr (j == std::to_underlying(EulerAnglesAxis::X)) return 1; else return 0;}(),
+                [&]{if constexpr (j == std::to_underlying(EulerAnglesAxis::Y)) return 1; else return 0;}(),
+                [&]{if constexpr (j == std::to_underlying(EulerAnglesAxis::Z)) return 1; else return 0;}()
+            ),
+            angles[1]
+        );
+        auto Q2 = quat_axis_angle(
+            vec<typename V::value_type>(
+                [&]{if constexpr (k == std::to_underlying(EulerAnglesAxis::X)) return 1; else return 0;}(),
+                [&]{if constexpr (k == std::to_underlying(EulerAnglesAxis::Y)) return 1; else return 0;}(),
+                [&]{if constexpr (k == std::to_underlying(EulerAnglesAxis::Z)) return 1; else return 0;}()
+            ),
+            [&]{if constexpr(frame == EulerAnglesFrame::Static) return angles[2]; else return angles[0];}()
+        );
+        return Q2 * Q1 * Q0;
+    }
+
+    template <ConceptVector V>
+    inline auto quat_euler_angles(const V& angles, EulerAnglesOrder order) {
+        auto tmp_angles = vec<typename V::value_type>(angles);
+        auto [parity, repetition, frame, i, j, k, h] = unpack_euler_angles_order(order);
+        if (frame == EulerAnglesFrame::Rotating) {
+            std::swap(tmp_angles[0], tmp_angles[2]);
+        }
+        auto Q0 = quat_axis_angle(
+            vec<typename V::value_type>(
+                i == std::to_underlying(EulerAnglesAxis::X)? 1 : 0,
+                i == std::to_underlying(EulerAnglesAxis::Y)? 1 : 0,
+                i == std::to_underlying(EulerAnglesAxis::Z)? 1 : 0
+            ),
+            tmp_angles[0]
+        );
+        auto Q1 = quat_axis_angle(
+            vec<typename V::value_type>(
+                j == std::to_underlying(EulerAnglesAxis::X)? 1 : 0,
+                j == std::to_underlying(EulerAnglesAxis::Y)? 1 : 0,
+                j == std::to_underlying(EulerAnglesAxis::Z)? 1 : 0
+            ),
+            tmp_angles[1]
+        );
+        auto Q2 = quat_axis_angle(
+            vec<typename V::value_type>(
+                k == std::to_underlying(EulerAnglesAxis::X)? 1 : 0,
+                k == std::to_underlying(EulerAnglesAxis::Y)? 1 : 0,
+                k == std::to_underlying(EulerAnglesAxis::Z)? 1 : 0
+            ),
+            tmp_angles[2]
+        );
+        return Q2 * Q1 * Q0;
+    }
+
+    // Hyperspherical coordinates - generalization of polar and spherical coordinates
+    // to N dimensions with X coordinate acting as the pole due to being the common axis
     template <ConceptVector V, bool InverseTransform>
     struct HypersphericalCoordinates {
         V coordinates;

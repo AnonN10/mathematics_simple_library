@@ -1,5 +1,4 @@
 #include <iostream>
-#include <iomanip>
 #include <cstdlib>
 
 #include "mathematics_simple_library.hpp"

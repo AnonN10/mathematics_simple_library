@@ -104,7 +104,7 @@ int main() {
 
 	std::cout << "## vector or matrix object (embedded storage: std::array or std::vector) ##" << std::endl;
 	PRINT_EXEC(print(vec_static_t<4, float>(1, 2, 3, 4)));
-	PRINT_EXEC(auto vobj_static = vec<2>({1, 2, 3, 4}));
+	PRINT_EXEC(auto vobj_static = vec(1, 2));
 	PRINT_EXEC(auto vobj_dynamic = vec<float>({1, 2, 3, 4}));
 	PRINT_EXEC(print(vobj_static));
 	PRINT_EXEC(print(vobj_dynamic));
@@ -137,10 +137,10 @@ int main() {
 	std::cout << std::endl;
 	
 	std::cout << "## temporary objects in expressions and underlying type casting via object constructor ##" << std::endl;
-	PRINT_EXEC(auto vector_int = vec<2>({1, 2}));
+	PRINT_EXEC(auto vector_int = vec<int>(1, 2));
 	PRINT_EXEC(print(vector_int));
 	PRINT_EXEC(print(vec<float>(vector_int)));
-	PRINT_EXEC(auto vector_of_vectors = vec<2, vec_static_t<2, int>>({{-1, 0}, {1, 2}}));
+	PRINT_EXEC(auto vector_of_vectors = vec<2, vec_static_t<2, int>>(vec(-1, 0), vec(1, 2)));
 	PRINT_EXEC(print(vector_of_vectors));
 	PRINT_EXEC(auto vector_of_float_vectors = vec<vec_static_t<2, float>>(vector_of_vectors));
 	PRINT_EXEC(print(vector_of_float_vectors));
@@ -303,6 +303,7 @@ int main() {
 	std::cout << std::endl;
 	
 	std::cout << "## function library ##" << std::endl;
+	std::cout << " - matrix -" << std::endl;
 	PRINT_EXEC(std::cout << trace(transform) << std::endl);
 	PRINT_EXEC(std::cout << determinant(transform) << std::endl);
 	PRINT_EXEC(std::cout << determinant(mat_identity<4, 4>()) << std::endl);
@@ -326,6 +327,7 @@ int main() {
 	PRINT_EXEC(print(adjugate(transform)));
 	PRINT_EXEC(print(cofactor(transform)));
 	PRINT_EXEC(print(gramian(transform)));
+	std::cout << " - vector/ray -" << std::endl;
 	PRINT_EXEC(print(normalize(vec_ref({1,1,1}))));
 	PRINT_EXEC(print(normalize_max(vec_ref<float>({1,5,10}))));
 	PRINT_EXEC(print(normalize_minmax(vec_ref<float>({-10,5,10}))));
@@ -351,6 +353,13 @@ int main() {
 	PRINT_EXEC(print(vector_projection(incident_ray, normal)));
 	PRINT_EXEC(print(vector_rejection(incident_ray, normal)));
 	PRINT_EXEC(print(orthonormalize(incident_ray, normal)));
+	std::cout << " - Euler angles -" << std::endl;
+	PRINT_EXEC(auto ea_quat = quat_euler_angles<EulerAnglesOrder::ZYXr>(vec<float>(9, 10, 21)));
+	PRINT_EXEC(print(ea_quat));
+	PRINT_EXEC(auto ea = euler_angles(ea_quat, EulerAnglesOrder::ZYXr));
+	PRINT_EXEC(print(ea));
+	PRINT_EXEC(print(slerp_flip(quat_euler_angles(ea, EulerAnglesOrder::ZYXr), ea_quat)));
+	std::cout << " - hyperspherical coordinates -" << std::endl;
 	PRINT_EXEC(print(cartesian_to_hyperspherical(vec_ref<float>({1}))));
 	PRINT_EXEC(print(cartesian_to_hyperspherical(vec_ref<float>({1, 2}))));
 	PRINT_EXEC(print(cartesian_to_hyperspherical(vec_ref<float>({1, 2, 3}))));

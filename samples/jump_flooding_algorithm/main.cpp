@@ -1,8 +1,6 @@
 #include <iostream>
-#include <iomanip>
 
 #include <cstdlib>
-#include <random>
 #include <tuple>
 #include <vector>
 #include <type_traits>
@@ -16,17 +14,6 @@
 #include "stb_image_write.h"
 
 using namespace Maths;
-
-template<typename T>
-T random_range(T range_from, T range_to) {
-    std::random_device                     rand_dev;
-    std::mt19937                           generator(rand_dev());
-    std::conditional_t<
-		std::is_integral_v<T>,
-		std::uniform_int_distribution<T>,
-		std::uniform_real_distribution<T>> distr(range_from, range_to);
-    return distr(generator);
-}
 
 template<typename T>
 constexpr auto distance_metric(T x) {
