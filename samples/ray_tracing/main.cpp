@@ -586,7 +586,7 @@ int main(int argc, char ** argv) {
                                     break;
                                 }
                                 //sky
-                                color = vec_ref({0.4f, 0.7f, 1.0f}) * std::clamp(dot(ray_direction, vec_ref({0, 1, 0})), 0.0f, 1.0f);
+                                color = throughput * vec_ref({0.4f, 0.7f, 1.0f}) * std::clamp(dot(ray_direction, vec_ref({0, 1, 0})), 0.0f, 1.0f);
                                 break;
                             }
 
