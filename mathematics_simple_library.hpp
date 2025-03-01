@@ -1742,6 +1742,53 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
     template <IndexType Column, ConceptMatrix M>
     constexpr auto column_of(const M& m) { return row_of<Column>(transpose(m)); }
 
+    template <ConceptMatrix M, ConceptVector V, ConceptExtent E>
+    struct SetRow {
+        M matrix;
+        V vector;
+        E row;
+
+        using value_type = M::value_type;
+        constexpr static bool column_major = M::column_major;
+
+        constexpr auto ref() const { return *this; }
+
+        constexpr SetRow(const M& matrix, const V& vector, const E& row = {})
+            : matrix(matrix), vector(vector), row(row)
+        {
+            assert_extent(row, matrix.row_count(), std::less<>{});
+            assert_extent(vector.size(), matrix.column_count(), std::greater_equal<>{});
+        }
+
+        constexpr auto operator[] (IndexType row, IndexType column) const {
+            if(row == this->row.get()) return static_cast<value_type>(vector[column]);
+            return matrix[row, column];
+        }
+
+        constexpr auto row_count() const { return matrix.row_count(); }
+        constexpr auto column_count() const { return matrix.column_count(); }
+    };
+
+    template <IndexType Row, ConceptMatrix M, ConceptVector V>
+    constexpr auto set_row(const M& m, const V& v) {
+        return SetRow<decltype(m.ref()), decltype(v.ref()), StaticExtent<Row>>{ m.ref(), v.ref() };
+    }
+
+    template <ConceptMatrix M, ConceptVector V>
+    constexpr auto set_row(const M& m, const V& v, IndexType row) {
+        return SetRow<decltype(m.ref()), decltype(v.ref()), DynamicExtent>{ m.ref(), v.ref(), row };
+    }
+
+    template <IndexType Column, ConceptMatrix M, ConceptVector V>
+    constexpr auto set_column(const M& m, const V& v) {
+        return transpose(set_row<Column>(transpose(m), v));
+    }
+
+    template <ConceptMatrix M, ConceptVector V>
+    constexpr auto set_column(const M& m, const V& v, IndexType column) {
+        return transpose(set_row(transpose(m), v, column));
+    }
+
     template <ConceptMatrix M, typename UnaryOperator, bool Indexed>
     struct MatrixUnaryOperation {
         M matrix;
@@ -1783,6 +1830,16 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
     template <ConceptMatrix M, typename UnaryOperator, bool Indexed = false>
     constexpr auto unary_operation(const M& m, const UnaryOperator& op) {
         return unary_operation<Indexed, M, UnaryOperator>(m, op);
+    }
+
+    template<ConceptMatrix M>
+    constexpr auto abs(const M& m) {
+        return unary_operation(m, [](auto x){ using std::abs; return abs(x); });
+    }
+
+    template<ConceptMatrix M>
+    constexpr auto sign(const M& m) {
+        return unary_operation(m, [](auto x){ return std::signbit(x) ? -1 : 1; });
     }
 
     template <ConceptMatrix L, ConceptMatrix R>
@@ -2911,6 +2968,18 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
     constexpr auto binary_operation_component_wise(const L& l, const R& r, const BinaryOperator& op) {
         return binary_operation_component_wise<Indexed, L, R, BinaryOperator>(l, r, op);
     }
+    template <ConceptVector V>
+    constexpr auto any(const V& v) {
+        for(IndexType i = 0; i < v.size().get(); ++i)
+            if(v[i]) return true;
+        return false;
+    }
+    template <ConceptVector V>
+    constexpr auto all(const V& v) {
+        for(IndexType i = 0; i < v.size().get(); ++i)
+            if(!v[i]) return false;
+        return true;
+    }
 
     template <ConceptVector L, ConceptVector R>
     constexpr auto operator* (const L& l, const R& r) {
@@ -2927,6 +2996,30 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
     template <ConceptVector L, ConceptVector R>
     constexpr auto operator- (const L& l, const R& r) {
         return VectorComponentWiseBinaryOperation<decltype(l.ref()), decltype(r.ref()), std::minus<>, false>{ l.ref(), r.ref() };
+    }
+    template <ConceptVector L, ConceptVector R>
+    constexpr auto operator== (const L& l, const R& r) {
+        return VectorComponentWiseBinaryOperation<decltype(l.ref()), decltype(r.ref()), std::equal_to<>, false>{ l.ref(), r.ref() };
+    }
+    template <ConceptVector L, ConceptVector R>
+    constexpr auto operator!= (const L& l, const R& r) {
+        return VectorComponentWiseBinaryOperation<decltype(l.ref()), decltype(r.ref()), std::not_equal_to<>, false>{ l.ref(), r.ref() };
+    }
+    template <ConceptVector L, ConceptVector R>
+    constexpr auto operator> (const L& l, const R& r) {
+        return VectorComponentWiseBinaryOperation<decltype(l.ref()), decltype(r.ref()), std::greater<>, false>{ l.ref(), r.ref() };
+    }
+    template <ConceptVector L, ConceptVector R>
+    constexpr auto operator>= (const L& l, const R& r) {
+        return VectorComponentWiseBinaryOperation<decltype(l.ref()), decltype(r.ref()), std::greater_equal<>, false>{ l.ref(), r.ref() };
+    }
+    template <ConceptVector L, ConceptVector R>
+    constexpr auto operator< (const L& l, const R& r) {
+        return VectorComponentWiseBinaryOperation<decltype(l.ref()), decltype(r.ref()), std::less<>, false>{ l.ref(), r.ref() };
+    }
+    template <ConceptVector L, ConceptVector R>
+    constexpr auto operator<= (const L& l, const R& r) {
+        return VectorComponentWiseBinaryOperation<decltype(l.ref()), decltype(r.ref()), std::less_equal<>, false>{ l.ref(), r.ref() };
     }
 
     template <ConceptVector L, typename Field, typename BinaryOperator, bool Indexed>
@@ -2989,6 +3082,43 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
     constexpr auto& operator+= (L& l, const R& r) { l = l + r; return l; }
     template <ConceptVector L, typename R>
     constexpr auto& operator-= (L& l, const R& r) { l = l - r; return l; }
+    
+    template <ConceptVector V, typename Field>
+    constexpr auto operator== (const V& l, const Field& r) {
+        return VectorScalarBinaryOperation<decltype(l.ref()), Field, std::equal_to<>, false>{ l.ref(), r };
+    }
+    template <ConceptVector V, typename Field>
+    constexpr auto operator!= (const V& l, const Field& r) {
+        return VectorScalarBinaryOperation<decltype(l.ref()), Field, std::not_equal_to<>, false>{ l.ref(), r };
+    }
+    template <ConceptVector V, typename Field>
+    constexpr auto operator> (const V& l, const Field& r) {
+        return VectorScalarBinaryOperation<decltype(l.ref()), Field, std::greater<>, false>{ l.ref(), r };
+    }
+    template <ConceptVector V, typename Field>
+    constexpr auto operator>= (const V& l, const Field& r) {
+        return VectorScalarBinaryOperation<decltype(l.ref()), Field, std::greater_equal<>, false>{ l.ref(), r };
+    }
+    template <ConceptVector V, typename Field>
+    constexpr auto operator< (const V& l, const Field& r) {
+        return VectorScalarBinaryOperation<decltype(l.ref()), Field, std::less<>, false>{ l.ref(), r };
+    }
+    template <ConceptVector V, typename Field>
+    constexpr auto operator<= (const V& l, const Field& r) {
+        return VectorScalarBinaryOperation<decltype(l.ref()), Field, std::less_equal<>, false>{ l.ref(), r };
+    }
+    template <typename Field, ConceptVector V>
+    constexpr auto operator== (const Field& l, const V& r) { return r == l; }
+    template <typename Field, ConceptVector V>
+    constexpr auto operator!= (const Field& l, const V& r) { return r != l; }
+    template <typename Field, ConceptVector V>
+    constexpr auto operator> (const Field& l, const V& r) { return r < l; }
+    template <typename Field, ConceptVector V>
+    constexpr auto operator>= (const Field& l, const V& r) { return r <= l; }
+    template <typename Field, ConceptVector V>
+    constexpr auto operator< (const Field& l, const V& r) { return r > l; }
+    template <typename Field, ConceptVector V>
+    constexpr auto operator<= (const Field& l, const V& r) { return r >= l; }
 
     template <bool Indexed, ConceptVector A, typename B, typename BinaryOperator>
     constexpr auto binary_operation(const A& v, const B& b, const BinaryOperator& op) {
@@ -3233,6 +3363,11 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
 
         using tag_type = QuaternionTag;
         using value_type = V::value_type;
+
+        constexpr Quaternion()
+        {
+            components = V(1, 0, 0, 0);
+        }
 
         template<ConceptVector U>
         constexpr Quaternion(const U& v) : components(v)
