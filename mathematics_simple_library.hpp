@@ -3895,6 +3895,125 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
         return Q2 * Q1 * Q0;
     }
 
+    template <ConceptMatrixStatic M>
+    requires (row_count_static<M>() == 1 && column_count_static<M>() == 1)
+    constexpr bool is_chirality_reversing(const M& m) {
+        return m[0,0] < 0;
+    }
+
+    template <ConceptMatrixStatic M>
+    requires (row_count_static<M>() == 2 && column_count_static<M>() == 2)
+    constexpr bool is_chirality_reversing(const M& m) {
+        return determinant(m) < 0;
+    }
+
+    template <ConceptMatrixStatic M>
+    requires (row_count_static<M>() == 3 && column_count_static<M>() == 3)
+    constexpr bool is_chirality_reversing(const M& m) {
+        return dot(column_of<0>(m), cross(column_of<1>(m), column_of<2>(m))) < 0;
+    }
+
+    template <ConceptMatrix M>
+    constexpr bool is_chirality_reversing(const M& m) {
+        assert(m.row_count().get() <= 3 && m.column_count().get() <= 3);
+        if(m.row_count().get() == 3 && m.column_count().get() == 3) {
+            return dot(column_of(m, 0), cross(column_of(m, 1), column_of(m, 2))) < 0;
+        } else if(m.row_count().get() == 2 && m.column_count().get() == 2) {
+            return determinant(m) < 0;
+        }
+        return m[0,0] < 0;
+    }
+
+    // "Decomposing a matrix into simple transformations" by Spencer W. Thomas, Graphics Gems II
+    // Experimental, contains ad-hoc, not thoroughly tested patches for singular matrices
+    template <ConceptMatrix M>
+    inline auto decompose_mat4x4(const M& m) {
+        assert_extent(m.row_count(), StaticExtent<4>{}, std::equal_to<>{});
+        assert_extent(m.column_count(), StaticExtent<4>{}, std::equal_to<>{});
+
+        using std::abs;
+        constexpr auto epsilon = std::numeric_limits<typename M::value_type>::epsilon();
+
+        //perform homogeneous normalization
+        auto m_norm = mat(m/m[3,3]);
+        auto m_norm_3x3 = mat(submatrix<3, 3>(m_norm));
+
+        auto perspective = vec(row_of<3>(m_norm));
+        
+        bool is_3x3_submatrix_singular = abs(determinant(m_norm_3x3)) < epsilon;
+        if(!is_3x3_submatrix_singular) {
+            auto m_norm_no_perspective = extend_identity<4, 4>(rectangular_partition<0, 3, 0, 4>(m_norm));
+            //transposing because row vector convention was used in the chapter
+            //and we use the standard column vector convention
+            perspective = vec(transpose(inverse(m_norm_no_perspective)) * row_of<3>(m_norm));
+        }
+
+        auto translation = vec<3>(column_of<3>(m_norm));
+
+        //compute X scaling factor and normalize 1st column with it
+        auto scale_x = magnitude(column_of<0>(m_norm_3x3));
+        if(!(abs(scale_x) < epsilon)) {
+            m_norm_3x3 = set_column<0>(m_norm_3x3, column_of<0>(m_norm_3x3)/scale_x);
+        } else {
+            //assume identity X basis vector which was nullified by zero scaling
+            m_norm_3x3 = set_column<0>(m_norm_3x3, vec(1, 0, 0));
+            scale_x = 0;
+        }
+        //compute XY shear and orthogonalize second column with respect to first
+        auto shear_xy = dot(column_of<0>(m_norm_3x3), column_of<1>(m_norm_3x3));
+        m_norm_3x3 = set_column<1>(m_norm_3x3, column_of<1>(m_norm_3x3) - column_of<0>(m_norm_3x3)*shear_xy);
+        //compute Y scaling factor and normalize 2nd column with it
+        auto scale_y = magnitude(column_of<1>(m_norm_3x3));
+        if(!(abs(scale_y) < epsilon)) {
+            m_norm_3x3 = set_column<1>(m_norm_3x3, column_of<1>(m_norm_3x3)/scale_y);
+            //finalize XY shear
+            shear_xy /= scale_y;
+        } else {
+            //compute orthogonal Y basis vector which was nullified by zero scaling using ZX plane
+            auto ortho_vec = vec(cross(column_of<2>(m_norm_3x3), column_of<0>(m_norm_3x3)));
+            auto ortho_vec_mag = magnitude(ortho_vec);
+            if(abs(ortho_vec_mag) < epsilon) {
+                //3rd column must also be zero vector, we assume it's a nullified identity Z basis vector
+                ortho_vec = vec(cross(vec(0, 0, 1), column_of<0>(m_norm_3x3)));
+                ortho_vec_mag = magnitude(ortho_vec);
+            }
+            m_norm_3x3 = set_column<1>(m_norm_3x3, ortho_vec/ortho_vec_mag);
+            shear_xy = 0;
+            scale_y = 0;
+        }
+        //compute XZ and YZ shears and orthogonalize third column with respect to the first two columns
+        auto shear_xz = dot(column_of<0>(m_norm_3x3), column_of<2>(m_norm_3x3));
+        m_norm_3x3 = set_column<2>(m_norm_3x3, column_of<2>(m_norm_3x3) - column_of<0>(m_norm_3x3)*shear_xz);
+        auto shear_yz = dot(column_of<1>(m_norm_3x3), column_of<2>(m_norm_3x3));
+        m_norm_3x3 = set_column<2>(m_norm_3x3, column_of<2>(m_norm_3x3) - column_of<1>(m_norm_3x3)*shear_yz);
+        //compute Z scaling factor and normalize 3rd column with it
+        auto scale_z = magnitude(column_of<2>(m_norm_3x3));
+        if(!(abs(scale_z) < epsilon)) {
+            m_norm_3x3 = set_column<2>(m_norm_3x3, column_of<2>(m_norm_3x3)/scale_z);
+            //rescale XY and YZ shears
+            shear_xz /= scale_z;
+            shear_yz /= scale_z;
+        } else {
+            //compute orthogonal Z basis vector which was nullified by zero scaling using XY plane
+            m_norm_3x3 = set_column<2>(m_norm_3x3, normalize(cross(column_of<0>(m_norm_3x3), column_of<1>(m_norm_3x3))));
+            shear_xz = 0;
+            shear_yz = 0;
+            scale_z = 0;
+        }
+
+        //at this point, the matrix that we have is a pure rotation matrix,
+        //for the exception that it may still alter the handedness, which
+        //we would rather attribute to negative scaling than rotation
+        if(is_chirality_reversing(m_norm_3x3)) {
+            m_norm_3x3 = -m_norm_3x3;
+            scale_x = -scale_x;
+            scale_y = -scale_y;
+            scale_z = -scale_z;
+        }
+
+        return std::make_tuple(perspective, translation, vec(scale_x, scale_y, scale_z), vec(shear_yz, shear_xz, shear_xy), m_norm_3x3);
+    }
+
     // Hyperspherical coordinates - generalization of polar and spherical coordinates
     // to N dimensions with X coordinate acting as the pole due to being the common axis
     template <ConceptVector V, bool InverseTransform>
