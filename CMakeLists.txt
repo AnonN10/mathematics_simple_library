@@ -10,6 +10,8 @@ set_property(TARGET MainDemo PROPERTY CXX_STANDARD 23)
 set_property(TARGET MainDemo PROPERTY CXX_STANDARD_REQUIRED On)
 set_property(TARGET MainDemo PROPERTY CXX_EXTENSIONS Off)
 
+option(USE_SDL2_AS_PACKAGE "Use SDL2 package instead of submodule" OFF)
+
 add_subdirectory(samples/blue_noise_generator/)
 add_subdirectory(samples/lights_out_solver/)
 add_subdirectory(samples/jump_flooding_algorithm/)
