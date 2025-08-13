@@ -6,4 +6,4 @@ It does what you'd expect from an average utility library, to get a feeling what
 
 ## Note
 
-This is a development branch and is a subject to breaking changes, see [v1](https://github.com/AnonN10/mathematics_simple_library/tree/v1) for LTS expression-templates based version, or [truly-simple](https://github.com/AnonN10/mathematics_simple_library/tree/truly-simple) for barebones naive implementation.
+This is a development branch of expression-template based approach and is a subject to breaking changes, see [truly-simple](https://github.com/AnonN10/mathematics_simple_library/tree/truly-simple) for barebones naive implementation.
