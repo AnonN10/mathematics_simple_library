@@ -342,17 +342,17 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
         return result >= T(0) ? result : result + b;
     }
     template <typename T, typename U>
-    constexpr auto euclidean_modulo(T a, U b) { return euclidean_remainder(a, b); }
+    constexpr auto euclidean_modulo(const T& a, const U& b) { return euclidean_remainder(a, b); }
     template <typename T, typename U>
-    constexpr auto eucmod(T a, U b) { return euclidean_remainder(a, b); }
+    constexpr auto eucmod(const T& a, const U& b) { return euclidean_remainder(a, b); }
 
     template <typename T>
-    constexpr auto circular_shift(T x, T shift, T width) { return euclidean_modulo(x + shift, width); }
+    constexpr auto circular_shift(const T& x, const T& shift, const T& width) { return euclidean_modulo(x + shift, width); }
     template <typename T>
-    constexpr auto circshift(T x, T shift, T width) { return circular_shift(x, shift, width); }
+    constexpr auto circshift(const T& x, const T& shift, const T& width) { return circular_shift(x, shift, width); }
 
     template <typename T>
-    constexpr auto fftshift(T x, T width) {
+    constexpr auto fftshift(const T& x, const T& width) {
         if constexpr(std::is_unsigned_v<T>)
             return eucmod(width - eucmod(x, width) + width/static_cast<T>(2), width);
         else
@@ -445,7 +445,7 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
             return *this;
         }
 
-        constexpr Field& operator[] (IndexType element) const {
+        constexpr auto&& operator[] (IndexType element) const {
             assert(element < this->size().get());
             return base_ptr[element];
         }
@@ -530,8 +530,8 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
         template <ConceptVector V>
         constexpr VectorObjectStatic& operator= (const V& v) { ref() = v; return *this; }
 
-        auto& operator[] (IndexType element) { return ref()[element]; }
-        constexpr auto& operator[] (IndexType element) const { return ref()[element]; }
+        auto&& operator[] (IndexType element) { return ref()[element]; }
+        constexpr auto&& operator[] (IndexType element) const { return ref()[element]; }
         constexpr auto size() const { return ref().size(); }
     };
 
@@ -582,8 +582,8 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
         auto ref() const { return RefType<const T> {std::data(data), std::size(data)}; }
         auto ref() { return RefType<T> { std::data(data), std::size(data) }; }
 
-        auto& operator[] (IndexType element) { return ref()[element]; }
-        const auto& operator[] (IndexType element) const { return ref()[element]; }
+        auto&& operator[] (IndexType element) { return ref()[element]; }
+        const auto&& operator[] (IndexType element) const { return ref()[element]; }
         auto size() const { return ref().size(); }
     };
 
