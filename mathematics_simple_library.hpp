@@ -3369,7 +3369,10 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
             components = V(1, 0, 0, 0);
         }
 
-        template<ConceptVector U>
+        template<ConceptVectorStatic U> requires (size_static<U>() == 4)
+        constexpr Quaternion(const U& v) : components(v) {}
+
+        template<ConceptVector U> requires (!ConceptVectorStatic<U>)
         constexpr Quaternion(const U& v) : components(v)
         {
             assert_extent(v.size(), StaticExtent<4>{}, std::equal_to<>{});
