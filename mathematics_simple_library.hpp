@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <cstdint>
 #include <algorithm>
+#include <limits>
 #include <type_traits>
 #include <functional>
 #include <numeric>
@@ -3359,6 +3360,7 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
 
     template <ConceptVector V>
     struct Quaternion {
+        //a, b, c, d convention, with a as scalar part and (b, c, d) as vector part
         V components;
 
         using tag_type = QuaternionTag;
@@ -3376,6 +3378,15 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
         constexpr Quaternion(const U& v) : components(v)
         {
             assert_extent(v.size(), StaticExtent<4>{}, std::equal_to<>{});
+        }
+        
+        template<ConceptVectorStatic U> requires (size_static<U>() == 3)
+        constexpr Quaternion(const value_type& s, const U& v) : components(s, v[0], v[1], v[2]) {}
+
+        template<ConceptVector U> requires (!ConceptVectorStatic<U>)
+        constexpr Quaternion(const value_type& s, const U& v) : components(s, v[0], v[1], v[2])
+        {
+            assert_extent(v.size(), StaticExtent<3>{}, std::equal_to<>{});
         }
 
         constexpr auto ref() const { return *this; }
@@ -3665,18 +3676,73 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
         return change_of_basis(quaternion, M, determinant(M));
     }
 
+    //returns a quaternion that is equivalent to the input quaternion,
+    //but with a non-negative inner product with the reference quaternion
+    //often used with slerp to ensure that the shortest path is taken
+    //and axis-angle decomposition to ensure consistency in a round trip
     template <ConceptQuaternion A, ConceptQuaternion B>
-    constexpr auto slerp_flip(const A& src_quat, const B& ref_quat) {
+    constexpr auto neighborhood(const A& src_quat, const B& ref_quat) {
         if(inner_product_euclidean(src_quat, ref_quat) < 0)
             return quat(-src_quat);
         return quat(src_quat);
     }
 
+    template <ConceptQuaternion A, ConceptQuaternion B>
+    constexpr auto slerp_flip(const A& src_quat, const B& ref_quat) {
+        return neighborhood(src_quat, ref_quat);
+    }
+
+    //returns a quaternion that rotates the forward vector to the given forward direction,
+    //and the up vector to the given up direction as much as possible
+    //the input forward and up vectors are expected to be non-zero, and not parallel to each other
+    //used where you want to construct a rotation from a forward and up direction, such as in a camera or billboard
     template <ConceptVector F, ConceptVector U>
     constexpr auto quat_look_rotation(const F& forward, const U& up) {
         auto up_orthonormal = orthonormalize(up, forward);
         auto right = cross(up_orthonormal, forward);
         return as_quaternion(join(join(as_column(right), as_column(up_orthonormal)), as_column(forward)));
+    }
+
+    //returns a pair of (axis, angle),
+    //axis is the unit vector representing the rotation axis,
+    //angle is the rotation angle in radians
+    template <ConceptQuaternion Q>
+    inline auto axis_angle_decomposition(const Q& q) {
+        using T = typename Q::value_type;
+
+        vec_static_t<3, T> axis;
+        T a = std::clamp(q.scalar(), T{-1}, T{1});
+        T angle = 2.0 * std::acos(a);
+
+        T sin_theta_over_2 = std::sqrt(1.0 - a * a);
+        if (sin_theta_over_2 < std::numeric_limits<T>::epsilon()) {
+            axis = {1, 0, 0};
+        } else {
+            axis = q.vector() / sin_theta_over_2;
+        }
+
+        return std::make_pair(axis, angle);
+    }
+
+    //returns a pair of (swing, twist) quaternions,
+    //where swing is the rotation that brings the twist axis to its final orientation,
+    //and twist is the rotation around the twist axis
+    //the input quaternion is expected to be normalized, and the twist axis is expected to be a unit vector
+    template <ConceptQuaternion Q, ConceptVector V>
+    inline auto swing_twist_decomposition(const Q& q, const V& twist_axis) {
+        using T = typename Q::value_type;
+
+        auto projection = twist_axis * dot(q.vector(), twist_axis);
+        if(magnitude(projection) < std::numeric_limits<T>::epsilon()) {
+            return std::make_pair(q, Q{});
+        }
+
+        Q twist(q.scalar(), projection);
+        twist = normalize(twist);
+
+        auto swing = q * conjugate(twist);
+
+        return std::make_pair(swing, twist);
     }
 
     // A C++ adaptation of Euler angles conversions by Ken Shoemake, 1993
