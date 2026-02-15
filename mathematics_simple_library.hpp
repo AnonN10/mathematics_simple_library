@@ -3724,6 +3724,24 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
         return std::make_pair(axis, angle);
     }
 
+    template <ConceptQuaternion Q, ConceptVector V>
+    inline auto axis_angle_decomposition(const Q& q, const V& axis) {
+        using T = typename Q::value_type;
+
+        V proj = axis * dot(q.vector(), axis);
+        Q twist{q.scalar(), proj};
+
+        T mag_sq = twist.scalar()*twist.scalar() + dot(proj, proj);
+        if(mag_sq < std::numeric_limits<T>::epsilon()) return T{0};
+        
+        twist = twist * (T{1} / std::sqrt(mag_sq));
+
+        T angle = T{2} * std::atan2(magnitude(proj), twist.scalar());
+        if(dot(q.vector(), axis) < 0) angle = -angle;
+
+        return angle;
+    }
+
     //returns a pair of (swing, twist) quaternions,
     //where swing is the rotation that brings the twist axis to its final orientation,
     //and twist is the rotation around the twist axis
