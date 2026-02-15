@@ -3740,7 +3740,7 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
         Q twist(q.scalar(), projection);
         twist = normalize(twist);
 
-        auto swing = q * conjugate(twist);
+        Q swing = q * conjugate(twist);
 
         return std::make_pair(swing, twist);
     }
