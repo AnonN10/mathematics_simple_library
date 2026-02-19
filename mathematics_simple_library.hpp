@@ -3742,6 +3742,13 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
         return angle;
     }
 
+    //extracts twist given that provided quaternion's rotation axis is aligned to the provided axis
+    template <ConceptQuaternion Q, ConceptVector V>
+    inline auto twist_decomposition(const Q& q, const V& axis) {
+        using T = typename Q::value_type;
+        return T{2} * std::atan2(dot(q.vector(), axis), q.scalar());
+    }
+
     //returns a pair of (swing, twist) quaternions,
     //where swing is the rotation that brings the twist axis to its final orientation,
     //and twist is the rotation around the twist axis
@@ -3750,14 +3757,23 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
     inline auto swing_twist_decomposition(const Q& q, const V& twist_axis) {
         using T = typename Q::value_type;
 
-        auto projection = twist_axis * dot(q.vector(), twist_axis);
-        if(magnitude(projection) < std::numeric_limits<T>::epsilon()) {
-            return std::make_pair(q, Q{});
+        auto r_vec = q.vector();
+        V projection = twist_axis * dot(r_vec, twist_axis);
+
+        //handle singularity: 180-degree rotation
+        if(q.scalar() * q.scalar() + dot(projection, projection) < std::numeric_limits<T>::epsilon()) {
+            V rotated_axis = q * twist_axis;
+            V swing_axis = cross(twist_axis, rotated_axis);
+            
+            if (dot(swing_axis, swing_axis) > std::numeric_limits<T>::epsilon()) {
+                T swing_angle = acos(clamp(dot(twist_axis, rotated_axis), T{-1}, T{1}));
+                return std::make_pair(quat_axis_angle(swing_axis, swing_angle), quat_axis_angle(twist_axis, T{std::numbers::pi}));
+            }
+            return std::make_pair(Q{1, V{0}}, quat_axis_angle(twist_axis, T{std::numbers::pi}));
         }
 
-        Q twist(q.scalar(), projection);
-        twist = normalize(twist);
-
+        //Norel's method
+        Q twist = normalize(Q{q.scalar(), projection});
         Q swing = q * conjugate(twist);
 
         return std::make_pair(swing, twist);
