@@ -3766,10 +3766,10 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
             V swing_axis = cross(twist_axis, rotated_axis);
             
             if (dot(swing_axis, swing_axis) > std::numeric_limits<T>::epsilon()) {
-                T swing_angle = acos(clamp(dot(twist_axis, rotated_axis), T{-1}, T{1}));
+                T swing_angle = acos(std::clamp(dot(twist_axis, rotated_axis), T{-1}, T{1}));
                 return std::make_pair(quat_axis_angle(swing_axis, swing_angle), quat_axis_angle(twist_axis, T{std::numbers::pi}));
             }
-            return std::make_pair(Q{1, V{0}}, quat_axis_angle(twist_axis, T{std::numbers::pi}));
+            return std::make_pair(Q{1, decltype(q.vector()){0}}, quat_axis_angle(twist_axis, T{std::numbers::pi}));
         }
 
         //Norel's method
