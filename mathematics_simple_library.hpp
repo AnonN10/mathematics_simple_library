@@ -3617,7 +3617,7 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
     template <ConceptMatrix M>
     struct MatrixAsQuaternion {
         M matrix;
-        std::remove_const_t<typename M::value_type> scale;
+        std::remove_const_t<typename M::value_type> scale, t0, t1, t2, t3;
 
         using tag_type = QuaternionTag;
         using value_type = typename M::value_type;
@@ -3628,7 +3628,12 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
             assert_extent(m.row_count(), StaticExtent<3>{}, std::equal_to<>{});
             assert_extent(m.column_count(), StaticExtent<3>{}, std::equal_to<>{});
 
+            //calculate scale factor and four potential radicands
             scale = pow(determinant(matrix), decltype(scale){1/3.0});
+            t0 = scale + matrix[0,0] + matrix[1,1] + matrix[2,2];
+            t1 = scale + matrix[0,0] - matrix[1,1] - matrix[2,2];
+            t2 = scale - matrix[0,0] + matrix[1,1] - matrix[2,2];
+            t3 = scale - matrix[0,0] - matrix[1,1] + matrix[2,2];
         }
 
         constexpr auto ref() const { return *this; }
@@ -3636,22 +3641,34 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
         constexpr auto operator[] (IndexType element) const {
             using std::sqrt;
             using std::max;
-            using std::copysign;
-            constexpr value_type zero {0};
-            constexpr value_type two {2};
-            switch(element) {
-                case 0: {
-                    return sqrt(max(zero, scale + matrix[0,0] + matrix[1,1] + matrix[2,2])) / two;
-                }
-                case 1: {
-                    return copysign(sqrt(max(zero, scale + matrix[0,0] - matrix[1,1] - matrix[2,2])) / two, matrix[2,1]-matrix[1,2]);
-                }
-                case 2: {
-                    return copysign(sqrt(max(zero, scale - matrix[0,0] + matrix[1,1] - matrix[2,2])) / two, matrix[0,2]-matrix[2,0]);
-                }
-                default: {
-                    return copysign(sqrt(max(zero, scale - matrix[0,0] - matrix[1,1] + matrix[2,2])) / two, matrix[1,0]-matrix[0,1]);
-                }
+            constexpr value_type zero{0}, two{2}, four{4};
+
+            //branch based on which component is largest to ensure a safe divisor
+            if(t0 >= t1 && t0 >= t2 && t0 >= t3) {
+                value_type w = sqrt(max(zero, t0)) / two;
+                if(element == 0) return w;
+                value_type s = 1 / (four * w);
+                if(element == 1) return (matrix[2,1] - matrix[1,2]) * s;
+                if(element == 2) return (matrix[0,2] - matrix[2,0]) * s;
+                return (matrix[1,0] - matrix[0,1]) * s;
+            } else if(t1 >= t2 && t1 >= t3) {
+                value_type x = sqrt(max(zero, t1)) / two;
+                if(element == 0) return (matrix[2,1] - matrix[1,2]) / (four * x);
+                if(element == 1) return x;
+                if(element == 2) return (matrix[0,1] + matrix[1,0]) / (four * x);
+                return (matrix[0,2] + matrix[2,0]) / (four * x);
+            } else if(t2 >= t3) {
+                value_type y = sqrt(max(zero, t2)) / two;
+                if(element == 0) return (matrix[0,2] - matrix[2,0]) / (four * y);
+                if(element == 1) return (matrix[0,1] + matrix[1,0]) / (four * y);
+                if(element == 2) return y;
+                return (matrix[1,2] + matrix[2,1]) / (four * y);
+            } else {
+                value_type z = sqrt(max(zero, t3)) / two;
+                if(element == 0) return (matrix[1,0] - matrix[0,1]) / (four * z);
+                if(element == 1) return (matrix[0,2] + matrix[2,0]) / (four * z);
+                if(element == 2) return (matrix[1,2] + matrix[2,1]) / (four * z);
+                return z;
             }
         }
 
