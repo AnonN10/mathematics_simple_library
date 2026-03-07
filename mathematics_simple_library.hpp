@@ -3720,6 +3720,36 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
         return as_quaternion(join(join(as_column(right), as_column(up_orthonormal)), as_column(forward)));
     }
 
+    template <ConceptVector A, ConceptVector B>
+    constexpr auto quat_from_to(const A& from, const B& to) {
+        using T = typename A::value_type;
+        using V = A;
+
+        auto f = normalize(from);
+        auto t = normalize(to);
+        T cos_theta = dot(f, t);
+        V axis = cross(f, t);
+
+        //if vectors are almost identical
+        if(cos_theta > T{1} - T{1e-6}) {
+            //no rotation
+            return quat_t<T>{1, V{0}};
+        }
+
+        //if vectors are nearly opposite
+        if(cos_theta < T{-1} + T{1e-6}) {
+            //find orthogonal axis
+            V orthogonal = normalize(std::abs(f[0]) > std::abs(f[2])? V{-f[1], f[0], 0} : V{0, -f[2], f[1]});
+            // 180 degree rotation around orthogonal axis
+            return quat_t<T>{0, orthogonal};
+        }
+
+        T s = std::sqrt((T{1} + cos_theta) * T{2});
+        T inv_s = T{1} / s;
+
+        return quat_t<T>(normalize(quat_t<T>{s * T{0.5}, axis * inv_s}));
+    }
+
     //returns a pair of (axis, angle),
     //axis is the unit vector representing the rotation axis,
     //angle is the rotation angle in radians
