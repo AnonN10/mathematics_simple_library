@@ -137,14 +137,14 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
         return convert_units_angular<SourceUnit, Units::Angular::Degrees>(x);
     }
     template <Units::Angular SourceUnit, typename T>
-    constexpr auto degrees(T x) { degrees<T, SourceUnit>(x); }
+    constexpr auto degrees(T x) { return degrees<T, SourceUnit>(x); }
     
     template <typename T, Units::Angular SourceUnit = Units::Angular::Degrees>
     constexpr auto radians(T x) {
         return convert_units_angular<SourceUnit, Units::Angular::Radians>(x);
     }
     template <Units::Angular SourceUnit, typename T>
-    constexpr auto radians(T x) { radians<T, SourceUnit>(x); }
+    constexpr auto radians(T x) { return radians<T, SourceUnit>(x); }
 
     template <class T>
     concept ConceptContainer = requires(T& container) {
@@ -316,6 +316,18 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
     constexpr auto row_count_static() { return decltype(std::declval<M>().row_count())::get(); }
     template <ConceptMatrix M>
     constexpr auto column_count_static() { return decltype(std::declval<M>().column_count())::get(); }
+
+    template <ConceptMatrix L, ConceptMatrix R>
+    struct MatrixMultiplication;
+
+    template <typename T>
+    struct is_matrix_multiplication : std::false_type {};
+
+    template <ConceptMatrix L, ConceptMatrix R>
+    struct is_matrix_multiplication<MatrixMultiplication<L, R>> : std::true_type {};
+
+    template <typename T>
+    inline constexpr bool is_matrix_multiplication_v = is_matrix_multiplication<T>::value;
 
     template<typename T>
     T random_range(T range_from, T range_to) {
@@ -584,7 +596,7 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
         auto ref() { return RefType<T> { std::data(data), std::size(data) }; }
 
         auto&& operator[] (IndexType element) { return ref()[element]; }
-        const auto&& operator[] (IndexType element) const { return ref()[element]; }
+        constexpr auto&& operator[] (IndexType element) const { return ref()[element]; }
         auto size() const { return ref().size(); }
     };
 
@@ -662,7 +674,7 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
 
         constexpr auto ref() const { return *this; }
 
-        constexpr auto operator[] (IndexType element) const {
+        constexpr value_type operator[] (IndexType element) const {
             if(element >= left.size().get())
                 return static_cast<value_type>(right[element - left.size().get()]);
             return left[element];
@@ -950,7 +962,44 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
         auto ref() { return RefType<T> { std::data(data) }; }
 
         template <ConceptMatrix M>
+        requires (!(is_matrix_multiplication_v<M> && std::is_arithmetic_v<value_type>))
         constexpr MatrixObjectStatic& operator= (const M& m) { ref() = m; return *this; }
+
+        template <typename RHS>
+        requires (is_matrix_multiplication_v<RHS> && std::is_arithmetic_v<value_type>)
+        constexpr MatrixObjectStatic& operator= (const RHS& m) {
+            std::fill(data.begin(), data.end(), value_type{0});
+            
+            auto&& left = m.left;
+            auto&& right = m.right;
+            
+            IndexType R1 = left.row_count().get();
+            IndexType C1 = left.column_count().get();
+            IndexType C2 = right.column_count().get();
+            
+            if constexpr (!column_major) {
+                //i-k-j loop ordering
+                for(IndexType i = 0; i < R1; ++i) {
+                    for(IndexType k = 0; k < C1; ++k) {
+                        auto left_val = left[i, k];
+                        for(IndexType j = 0; j < C2; ++j) {
+                            (*this)[i, j] += left_val * right[k, j];
+                        }
+                    }
+                }
+            } else {
+                //j-k-i loop ordering
+                for(IndexType j = 0; j < C2; ++j) {
+                    for(IndexType k = 0; k < C1; ++k) {
+                        auto right_val = right[k, j];
+                        for(IndexType i = 0; i < R1; ++i) {
+                            (*this)[i, j] += left[i, k] * right_val;
+                        }
+                    }
+                }
+            }
+            return *this;
+        }
 
         auto& operator[] (IndexType row, IndexType column) { return ref()[row, column]; }
         const auto& operator[] (IndexType row, IndexType column) const { return ref()[row, column]; }
@@ -1167,26 +1216,23 @@ namespace MATHEMATICS_SIMPLE_LIBRARY_NAMESPACE {
         return mat_procedural<ValueGenerator, ColumnMajor>(rows, columns, op);
     }
 
-    template <ConceptVector... Vectors>
+    template <ConceptVector... ProxyVectors> 
     struct ColumnVectorMatrix {
-        std::array<std::common_type_t<Vectors...>, sizeof...(Vectors)> vectors;
-
+        std::array<std::common_type_t<std::remove_cvref_t<ProxyVectors>...>, sizeof...(ProxyVectors)> vectors;
         constexpr static bool column_major = true;
 
-        constexpr ColumnVectorMatrix(Vectors... vs) {
-            vectors = {vs...};
-        }
+        constexpr ColumnVectorMatrix(ProxyVectors... vs) : vectors{{vs...}} {}
 
         constexpr auto ref() const { return *this; }
 
-        constexpr auto operator[] (IndexType row, IndexType column) const {
+        constexpr decltype(auto) operator[] (IndexType row, IndexType column) const { 
             return vectors[column][row];
         }
 
-        using value_type = decltype(std::declval<ColumnVectorMatrix<Vectors...>>()[0,0]);
+        using value_type = typename std::tuple_element_t<0, std::tuple<std::remove_cvref_t<ProxyVectors>...>>::value_type;
 
         constexpr auto row_count() const { return vectors[0].size(); }
-        constexpr auto column_count() const { return StaticExtent<sizeof...(Vectors)>{}; }
+        constexpr auto column_count() const { return StaticExtent<sizeof...(ProxyVectors)>{}; }
     };
 
     template <ConceptVector... Vectors>
